@@ -22,7 +22,7 @@ from werkzeug.exceptions import NotFound
 
 from pybossa.util import jsonpify, crossdomain
 import pybossa.model as model
-from pybossa.core import db
+from pybossa.core import db, get_locale
 from pybossa.auth import require
 from pybossa.hateoas import Hateoas
 from pybossa.vmcp import sign
@@ -263,6 +263,7 @@ class TaskRunAPI(APIBase):
     __class__ = model.TaskRun
 
     def _update_object(self, obj):
+	#db.session.query(model.User).filter_by(facebook_user_id= 123456789).first()
         if not current_user.is_anonymous():
             obj.user = current_user
         else:
@@ -311,6 +312,50 @@ def new_task(app_id):
     else:
         return res
 
+# Atualizar
+@jsonpify
+@blueprint.route('/app/get_current_user_id')
+@crossdomain(origin='*', headers=cors_headers)
+def get_current_user_id():
+    userId = None
+    if not current_user.is_anonymous():
+       userId = current_user.id
+    else:
+       userId = request.remote_addr
+    return Response( json.dumps({"current_user_id": str(userId)}), mimetype="application/json" )
+
+
+@jsonpify
+@blueprint.route('/user/authenticate', methods=['POST'])
+@crossdomain(origin='*', headers=cors_headers)
+def authenticate_user():
+    request_data = json.loads(request.data)
+    fb_user_id = request_data["facebook_user_id"]
+    user_email = request_data["email"]
+    user_name = request_data["name"]
+    user_by_fb_id = db.session.query(model.User).filter_by(facebook_user_id=fb_user_id).first()
+
+    if (user_by_fb_id == None):
+	user_by_email = db.session.query(model.User).filter_by(email_addr=user_email).first()
+	account = user_by_email
+	print(type(user_by_email))
+
+	if (account == None):
+	    print(account)
+	    account = model.User(fullname="", name=user_name, email_addr=user_email)
+	    account.set_password(user_email)
+	    account.locale = get_locale()
+	    print(account)
+	
+	print(type(account))
+	account.facebook_user_id = fb_user_id
+	print(account)
+        db.session.add(account)
+	print("passei 1")
+	db.session.commit()
+	print("passei 2")
+	
+    return Response(json.dumps({"response": "OK"}),  mimetype="application/json")
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
