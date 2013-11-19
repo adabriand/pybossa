@@ -152,11 +152,25 @@ class APIBase(MethodView):
         try:
             self.valid_args()
             data = json.loads(request.data)
+
+	    # Remove facebook_user_id key and retrieve the respective user
+	    fb_user = None
+	    if "facebook_user_id" in data.keys():
+		fb_api = UserFbAPI()
+	    	fb_user_id = data["facebook_user_id"]
+	        fb_user = fb_api.get_user_by_fb_id(fb_user_id)
+		del data["facebook_user_id"]
+
             # Clean HATEOAS args
             data = self.hateoas.remove_links(data)
             inst = self.__class__(**data)
             getattr(require, self.__class__.__name__.lower()).create(inst)
-            self._update_object(inst)
+
+	    if fb_user == None:
+                self._update_object(inst)
+	    else:
+	        inst.user = fb_user
+
             db.session.add(inst)
             db.session.commit()
             return json.dumps(inst.dictize())
@@ -263,12 +277,15 @@ class TaskRunAPI(APIBase):
     __class__ = model.TaskRun
 
     def _update_object(self, obj):
-	#db.session.query(model.User).filter_by(facebook_user_id= 123456789).first()
         if not current_user.is_anonymous():
             obj.user = current_user
         else:
             obj.user_ip = request.remote_addr
 
+class UserFbAPI:
+
+    def get_user_by_fb_id(self, fb_user_id):
+        return db.session.query(model.User).filter_by(facebook_user_id=fb_user_id).first()
 
 def register_api(view, endpoint, url, pk='id', pk_type='int'):
     view_func = view.as_view(endpoint)
@@ -301,8 +318,19 @@ def new_task(app_id):
             offset = int(request.args.get('offset'))
         else:
             offset = 0
-        user_id = None if current_user.is_anonymous() else current_user.id
-        user_ip = request.remote_addr if current_user.is_anonymous() else None
+
+        fb_user_id = request.args.get('facebook_user_id')
+	print(fb_user_id)
+
+	if (fb_user_id == None):
+	    user_id = None if current_user.is_anonymous() else current_user.id
+	else:
+	    fb_api = UserFbAPI()
+	    fb_user = fb_api.get_user_by_fb_id(int(fb_user_id))
+	    user_id = fb_user.id
+	    
+        user_ip = request.remote_addr if current_user.is_anonymous() and fb_user_id == None else None
+
         task = sched.new_task(app_id, user_id, user_ip, offset)
         # If there is a task for the user, return it
         if task:
@@ -333,29 +361,27 @@ def authenticate_user():
     fb_user_id = request_data["facebook_user_id"]
     user_email = request_data["email"]
     user_name = request_data["name"]
-    user_by_fb_id = db.session.query(model.User).filter_by(facebook_user_id=fb_user_id).first()
+    
+    fb_api = UserFbAPI()
+    user_by_fb_id = fb_api.get_user_by_fb_id(fb_user_id)
 
     if (user_by_fb_id == None):
 	user_by_email = db.session.query(model.User).filter_by(email_addr=user_email).first()
 	account = user_by_email
-	print(type(user_by_email))
 
 	if (account == None):
-	    print(account)
 	    account = model.User(fullname="", name=user_name, email_addr=user_email)
 	    account.set_password(user_email)
 	    account.locale = get_locale()
-	    print(account)
 	
-	print(type(account))
 	account.facebook_user_id = fb_user_id
-	print(account)
         db.session.add(account)
-	print("passei 1")
 	db.session.commit()
-	print("passei 2")
 	
     return Response(json.dumps({"response": "OK"}),  mimetype="application/json")
+
+
+
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
