@@ -320,15 +320,14 @@ def new_task(app_id):
             offset = 0
 
         fb_user_id = request.args.get('facebook_user_id')
-	print(fb_user_id)
-
-	if (fb_user_id == None):
-	    user_id = None if current_user.is_anonymous() else current_user.id
-	else:
-	    fb_api = UserFbAPI()
-	    fb_user = fb_api.get_user_by_fb_id(int(fb_user_id))
-	    user_id = fb_user.id
-	    
+        if (fb_user_id == None):
+            user_id = None if current_user.is_anonymous() else current_user.id
+    	else:
+            print(fb_user_id)
+    	    fb_api = UserFbAPI()
+    	    fb_user = fb_api.get_user_by_fb_id(int(fb_user_id))
+    	    user_id = fb_user.id
+    	    
         user_ip = request.remote_addr if current_user.is_anonymous() and fb_user_id == None else None
 
         task = sched.new_task(app_id, user_id, user_ip, offset)
@@ -340,18 +339,22 @@ def new_task(app_id):
     else:
         return res
 
-# Atualizar
 @jsonpify
 @blueprint.route('/app/get_current_user_id')
 @crossdomain(origin='*', headers=cors_headers)
 def get_current_user_id():
     userId = None
-    if not current_user.is_anonymous():
-       userId = current_user.id
+    fb_user_id = request.args.get('facebook_user_id')
+    
+    if (fb_user_id != None):
+        fb_api = UserFbAPI()
+        fb_user = fb_api.get_user_by_fb_id(int(fb_user_id))
+        userId = fb_user.id
+    elif not current_user.is_anonymous():
+        userId = current_user.id
     else:
-       userId = request.remote_addr
+        userId = request.remote_addr
     return Response( json.dumps({"current_user_id": str(userId)}), mimetype="application/json" )
-
 
 @jsonpify
 @blueprint.route('/user/authenticate', methods=['POST'])
@@ -380,9 +383,6 @@ def authenticate_user():
 	
     return Response(json.dumps({"response": "OK"}),  mimetype="application/json")
 
-
-
-
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
 @blueprint.route('/app/<int:app_id>/userprogress')
@@ -405,7 +405,17 @@ def user_progress(app_id=None, short_name=None):
                     .get(app_id)
 
         if app:
-            if current_user.is_anonymous():
+            
+            fb_user_id = request.args.get('facebook_user_id')
+            if fb_user_id != None:
+                fb_api = UserFbAPI()
+                fb_user = fb_api.get_user_by_fb_id(int(fb_user_id))
+                tr = db.session.query(model.TaskRun)\
+                       .filter(model.TaskRun.app_id == app.id)\
+                       .filter(model.TaskRun.user_id == fb_user.id)\
+                       .all()
+                
+            elif current_user.is_anonymous():
                 tr = db.session.query(model.TaskRun)\
                        .filter(model.TaskRun.app_id == app.id)\
                        .filter(model.TaskRun.user_ip == request.remote_addr)\
