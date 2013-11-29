@@ -153,24 +153,24 @@ class APIBase(MethodView):
             self.valid_args()
             data = json.loads(request.data)
 
-	    # Remove facebook_user_id key and retrieve the respective user
-	    fb_user = None
-	    if "facebook_user_id" in data.keys():
-		fb_api = UserFbAPI()
-	    	fb_user_id = data["facebook_user_id"]
-	        fb_user = fb_api.get_user_by_fb_id(fb_user_id)
-		del data["facebook_user_id"]
+    	    # Remove facebook_user_id key and retrieve the respective user
+    	    fb_user = None
+    	    if "facebook_user_id" in data.keys():
+                fb_api = UserFbAPI()
+    	    	fb_user_id = data["facebook_user_id"]
+    	        fb_user = fb_api.get_user_by_fb_id(fb_user_id)
+                del data["facebook_user_id"]
 
             # Clean HATEOAS args
             data = self.hateoas.remove_links(data)
             inst = self.__class__(**data)
             getattr(require, self.__class__.__name__.lower()).create(inst)
 
-	    if fb_user == None:
+            if fb_user == None:
                 self._update_object(inst)
-	    else:
-	        inst.user = fb_user
-
+            else:
+                inst.user = fb_user
+            
             db.session.add(inst)
             db.session.commit()
             return json.dumps(inst.dictize())
@@ -282,10 +282,31 @@ class TaskRunAPI(APIBase):
         else:
             obj.user_ip = request.remote_addr
 
-class UserFbAPI:
+class UserFbAPI(APIBase):
 
     def get_user_by_fb_id(self, fb_user_id):
         return db.session.query(model.User).filter_by(facebook_user_id=fb_user_id).first()
+    
+    def create_fb_user(self, user_full_name, user_name, user_email, fb_user_id):
+        try:
+            account = model.User(fullname=user_full_name, name=user_name, email_addr=user_email)
+            account.set_password(user_email)
+            account.locale = get_locale()
+            account.facebook_user_id = fb_user_id
+            db.session.add(account)
+            db.session.commit()
+            return Response(json.dumps({"response": "OK"}),  mimetype="application/json")
+        except Exception as e:
+            return self.format_exception(e, action='CREATE_FB_USER')
+    
+    def update_fb_user(self, account, fb_user_id):
+        try:
+            account.facebook_user_id = fb_user_id
+            db.session.add(account)
+            db.session.commit()
+            return Response(json.dumps({"response": "OK"}),  mimetype="application/json")
+        except Exception as e:
+            return self.format_exception(e, action='UPDATE_FB_USER')
 
 def register_api(view, endpoint, url, pk='id', pk_type='int'):
     view_func = view.as_view(endpoint)
@@ -319,15 +340,14 @@ def new_task(app_id):
         else:
             offset = 0
 
+        # Identify the current user
         fb_user_id = request.args.get('facebook_user_id')
         if (fb_user_id == None):
             user_id = None if current_user.is_anonymous() else current_user.id
     	else:
-            print(fb_user_id)
     	    fb_api = UserFbAPI()
     	    fb_user = fb_api.get_user_by_fb_id(int(fb_user_id))
     	    user_id = fb_user.id
-    	    
         user_ip = request.remote_addr if current_user.is_anonymous() and fb_user_id == None else None
 
         task = sched.new_task(app_id, user_id, user_ip, offset)
@@ -357,31 +377,27 @@ def get_current_user_id():
     return Response( json.dumps({"current_user_id": str(userId)}), mimetype="application/json" )
 
 @jsonpify
-@blueprint.route('/user/authenticate', methods=['POST'])
+@blueprint.route('/user/authenticate_facebook_user', methods=['POST'])
 @crossdomain(origin='*', headers=cors_headers)
-def authenticate_user():
+def authenticate_facebook_user():
     request_data = json.loads(request.data)
     fb_user_id = request_data["facebook_user_id"]
     user_email = request_data["email"]
     user_name = request_data["name"]
+    user_full_name = request_data["full_name"]
     
     fb_api = UserFbAPI()
-    user_by_fb_id = fb_api.get_user_by_fb_id(fb_user_id)
+    fb_user = fb_api.get_user_by_fb_id(fb_user_id)
+    if (fb_user == None):
+        user_by_email = db.session.query(model.User).filter_by(email_addr=user_email).first()
+        fb_user = user_by_email
 
-    if (user_by_fb_id == None):
-	user_by_email = db.session.query(model.User).filter_by(email_addr=user_email).first()
-	account = user_by_email
-
-	if (account == None):
-	    account = model.User(fullname="", name=user_name, email_addr=user_email)
-	    account.set_password(user_email)
-	    account.locale = get_locale()
-	
-	account.facebook_user_id = fb_user_id
-        db.session.add(account)
-	db.session.commit()
-	
-    return Response(json.dumps({"response": "OK"}),  mimetype="application/json")
+    res = None
+    if (fb_user == None):
+        res = fb_api.create_fb_user(user_full_name, user_name, user_email, fb_user_id)
+    else:
+        res = fb_api.update_fb_user(fb_user, fb_user_id)
+    return res
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
@@ -406,6 +422,7 @@ def user_progress(app_id=None, short_name=None):
 
         if app:
             
+            #  Identify the current user
             fb_user_id = request.args.get('facebook_user_id')
             if fb_user_id != None:
                 fb_api = UserFbAPI()
