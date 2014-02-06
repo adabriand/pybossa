@@ -419,10 +419,10 @@ def forgot_password():
                 msg.body = render_template(
                     '/account/email/forgot_password_openid.md',
                     user=user, account_name='Twitter')
-            elif user.facebook_user_id:
-                msg.body = render_template(
-                    '/account/email/forgot_password_openid.md',
-                    user=user, account_name='Facebook')
+            #elif user.facebook_user_id:
+            #    msg.body = render_template(
+            #        '/account/email/forgot_password_openid.md',
+            #        user=user, account_name='Facebook')
             elif user.google_user_id:
                 msg.body = render_template(
                     '/account/email/forgot_password_openid.md',
