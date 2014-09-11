@@ -1,6 +1,25 @@
+# -*- coding: utf8 -*-
+# This file is part of PyBossa.
+#
+# Copyright (C) 2013 SF Isle of Man Limited
+#
+# PyBossa is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# PyBossa is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
+
 from helper import sched
-from base import Fixtures
+from default import with_context
 import json
+from mock import patch
 
 
 class TestSched(sched.Helper):
@@ -9,18 +28,20 @@ class TestSched(sched.Helper):
         self.endpoints = ['app', 'task', 'taskrun']
 
     # Tests
-    def test_incremental_tasks(self):
-        """ Test incremental SCHED strategy - second TaskRun receives first gaven answer"""
-
-        Fixtures.create_2(sched='incremental')
+    @with_context
+    @patch('pybossa.api.task_run.request')
+    def test_incremental_tasks(self, mock_request):
+        """ Test incremental SCHED strategy - second TaskRun receives first given answer"""
+        self.create_2(sched='incremental')
+        mock_request.remote_addr = '127.0.0.0'
 
         # Del previous TaskRuns
         self.del_task_runs()
 
         # Register
-        self.register(fullname=self.user.fullname, username=self.user.username,
+        self.register(fullname=self.user.fullname, name=self.user.username,
                       password=self.user.password)
-        self.register(fullname="Marie Doe", username="mariedoe", password="dr0wss4p")
+        self.register(fullname="Marie Doe", name="mariedoe", password="dr0wss4p")
         self.signin()
 
         # Get the only task with no runs!

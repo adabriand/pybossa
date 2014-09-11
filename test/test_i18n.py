@@ -1,14 +1,34 @@
+# -*- coding: utf8 -*-
+# This file is part of PyBossa.
+#
+# Copyright (C) 2013 SF Isle of Man Limited
+#
+# PyBossa is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# PyBossa is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
+
 from helper import web
-from base import model, db, Fixtures
+from default import db, with_context
+from pybossa.model.user import User
 
 
 class TestI18n(web.Helper):
     def setUp(self):
         super(TestI18n, self).setUp()
-        Fixtures.create()
+        with self.flask_app.app_context():
+            self.create()
 
     # Tests
-
+    @with_context
     def test_00_i18n_anonymous(self):
         """Test i18n anonymous works"""
         # First default 'en' locale
@@ -22,6 +42,7 @@ class TestI18n(web.Helper):
             res = c.get('/', headers=[('Accept-Language', 'es')])
             assert "Comunidad" in res.data, err_msg
 
+    @with_context
     def test_01_i18n_authenticated(self):
         """Test i18n as an authenticated user works"""
         with self.app as c:
@@ -37,7 +58,7 @@ class TestI18n(web.Helper):
             assert "Community" in res.data, err_msg
 
             # Change it to Spanish
-            user = db.session.query(model.User).filter_by(name='johndoe').first()
+            user = db.session.query(User).filter_by(name='johndoe').first()
             user.locale = 'es'
             db.session.add(user)
             db.session.commit()

@@ -1,3 +1,21 @@
+# -*- coding: utf8 -*-
+# This file is part of PyBossa.
+#
+# Copyright (C) 2013 SF Isle of Man Limited
+#
+# PyBossa is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# PyBossa is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
+
 # DEBUG = False
 
 ## webserver host and port
@@ -7,9 +25,14 @@
 SECRET = 'foobar'
 SECRET_KEY = 'my-session-secret'
 
-SQLALCHEMY_DATABASE_URI = 'postgresql://tester:tester@localhost/pybossa'
-SQLALCHEMY_DATABASE_TEST_URI = 'postgresql://rtester:rtester@localhost/pybossa_test'
-ITSDANGEORUSKEY = 'its-dangerous-key'
+SQLALCHEMY_DATABASE_URI = 'postgresql://pybossa:tester@localhost/pybossa'
+
+##Slave configuration for DB
+#SQLALCHEMY_BINDS = {
+#    'slave': 'postgresql://user:password@server/db'
+#}
+
+ITSDANGEROUSKEY = 'its-dangerous-key'
 
 ## project configuration
 BRAND = 'PyBossa'
@@ -22,6 +45,8 @@ DATAUSE = 'http://opendatacommons.org/licenses/by/'
 CONTACT_EMAIL = 'info@pybossa.com'
 CONTACT_TWITTER = 'PyBossa'
 
+## Default number of projects per page
+## APPS_PER_PAGE = 20
 
 ## External Auth providers
 # TWITTER_CONSUMER_KEY=''
@@ -70,12 +95,37 @@ MAIL_DEFAULT_SENDER = 'PyBossa Support <info@pybossa.com>'
 ENFORCE_PRIVACY = False
 
 
-## Cache setup. By default it is disabled, you can use "simple" or "memcached"
-## Check the documentation for further details on flask-cache
-CACHE_TYPE = 'null'
-## In seconds: 20 minutes * 60 seconds
-CACHE_DEFAULT_TIMEOUT = 20*60
-### Cache setup. By default it will use SimpleCache 
-## If you want to use memcached install python-memcached (pip install python-memcached)
-#CACHE_TYPE = 'memcached'
-#CACHE_MEMCACHED_SERVERS = ['127.0.0.1:11211']
+## Cache setup. By default it is enabled
+## Redis Sentinel
+# List of Sentinel servers (IP, port)
+REDIS_CACHE_ENABLED = True
+REDIS_SENTINEL = [('localhost', 26379)]
+REDIS_MASTER = 'mymaster'
+REDIS_KEYPREFIX = 'pybossa_cache'
+
+## Allowed upload extensions
+ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif']
+
+## If you want to use the local uploader configure which folder
+UPLOAD_METHOD = 'local'
+UPLOAD_FOLDER = 'uploads'
+
+## If you want to use Rackspace for uploads, configure it here
+# RACKSPACE_USERNAME = 'username'
+# RACKSPACE_API_KEY = 'apikey'
+# RACKSPACE_REGION = 'ORD'
+
+## Default number of users shown in the leaderboard
+# LEADERBOARD = 20
+## Default shown presenters
+# PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf"]
+
+# Expiration time for password protected project cookies
+PASSWD_COOKIE_TIMEOUT = 60 * 30
+
+## Ratelimit configuration
+# LIMIT = 300
+# PER = 15 * 60
+
+# Disable new account confirmation (via email)
+ACCOUNT_CONFIRMATION_DISABLED = True

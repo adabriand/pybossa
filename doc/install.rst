@@ -6,8 +6,9 @@ PyBossa is a python web application built using the Flask micro-framework.
 
 Pre-requisites:
 
-  * Python >= 2.7, <3.0
+  * Python >= 2.7.2, <3.0
   * PostgreSQL version 9.1 and the Python bindings for PostgreSQL database. 
+  * Redis >= 2.6
   * pip for installing python packages (e.g. on ubuntu python-pip)
 
 .. note::
@@ -43,7 +44,7 @@ Installing git -a distributed version control system
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 PyBossa uses the git_ distributed version control system for handling the
-PyBossa server source code as well as the template applications. 
+PyBossa server source code as well as the template projects. 
 
 Git_ is a freen and open source distributed version control system designed to
 handle everything from small to very large projects with seepd and efficiency.
@@ -54,7 +55,7 @@ handle everything from small to very large projects with seepd and efficiency.
 
 In order to install the software, all you have to do is::
 
-    sudo aptitude install git
+    sudo apt-get install git
 
 Installing the PostgreSQL database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,7 +67,7 @@ has earned it a strong reputation for reliability, data integrity, and correctne
 PyBossa uses PostgreSQL_ as the main database for storing all the data, and you
 the required steps for installing it are the following::
 
-    sudo aptitude install postgresql-9.1
+    sudo apt-get install postgresql-9.1
 
 .. _PostgreSQL: http://www.postgresql.org/
 
@@ -89,11 +90,11 @@ solution.
 
 Installing virtualenv_ in the Ubuntu server could be done like this::
 
-    sudo aptitude install python-virtualenv
+    sudo apt-get install python-virtualenv
 
 After installing the software, now you will be able to create independent virtual
 environments for the PyBossa installation as well as for the template
-applications (see :doc:`user/tutorial`).
+projects (see :doc:`user/tutorial`).
 
 Installing the PyBossa Python requirements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -102,7 +103,7 @@ Installing the required libraries for PyBossa is a step that will need to use
 some compilers and dev libraries in order to work. Thus, you will need to
 install the following packages::
 
-    sudo aptitude install postgresql-server-dev-9.1 python-dev swig
+    sudo apt-get install postgresql-server-dev-9.1 python-dev swig libjpeg-dev
 
 Then, you are ready to download the code and install the required libraries for
 running PyBossa.
@@ -126,7 +127,8 @@ with **#** are comments)::
   # Activate the virtual environment
   source env/bin/activate
   # Install the required libraries
-  pip install -e .
+  pip install -r requirements.txt
+
 
 Otherwise you should be able to install the libraries in your system like
 this::
@@ -136,7 +138,7 @@ this::
   # Access the source code folder
   cd pybossa
   # Install the required libraries
-  pip install -e .
+  pip install -r requirements.txt
 
 .. note::
     Vim_ editor is a very popular text editor in GNU/Linux systems, however it
@@ -168,19 +170,123 @@ database::
   cp alembic.ini.template alembic.ini
   # now set the sqlalchemy.url ...
 
+.. _pybossa-cache:
+
+Installing Redis
+================
+
+Since version v0.2.1, PyBossa uses Redis not only for caching objects and speed
+up the site, but also for limiting the usage of the API requests.
+
+Redis can be installed via your GNU/Linux distribution package system (check
+that it is at least version 2.6) or downloading the package directly from its
+official Redis_ site.
+
+Once you have downloaded it, and installed it, you will need to run two
+instances:
+
+* **Redis-server**: as a master node, accepting read and write operations.
+* **Redis-sentinel**: as a sentinel node, to configure the master and slave Redis
+  nodes.
+
+Server
+------
+If you have installed the server via your distribution package system, then,
+the server will be running already. If this is not the case, check the official
+documentation of Redis_ to configure it and run it. The default values should
+be fine.
+
+.. note::
+    Please, make sure that you are running version >= 2.6
+
+.. note::
+    If you have installed the software using the source code, then, check the
+    contrib folder, as there is a specific folder for Redis with init.d start
+    scripts. You only have to copy that file to /etc/init.d/ and adapt it to
+    your needs.
+
+Sentinel
+--------
+Redis can be run in sentinel mode with the **--sentinel** arg, or by its own
+command named: redis-sentinel. This will vary from your distribution and
+version of Redis, so check its help page to know how you can run it.
+
+In any case, you will need to run a sentinel node, as PyBossa uses it to
+load-balance the queries, and also to autoconfigure the master and slaves
+automagically.
+
+In order to run PyBossa, you will need first to configure a Sentinel node.
+Create a config file named **sentinel.conf** with something like this::
+
+    sentinel monitor mymaster 127.0.0.1 6379 2
+    sentinel down-after-milliseconds mymaster 60000
+    sentinel failover-timeout mymaster 180000
+    sentinel parallel-syncs mymaster 1
+
+In the contrib folder you will find a file named **sentinel.conf** that should
+be enough to run the sentinel node. Thus, for running it::
+
+    redis-server contrib/sentinel.conf --sentinel
+
+.. note::
+    Please, make sure that you are running version >= 2.6
+
+.. note::
+    If you have installed the software using the source code, then, check the
+    contrib folder, as there is a specific folder for Redis with init.d start
+    scripts. You only have to copy that file to /etc/init.d/ and adapt it to
+    your needs.
+
+Speeding up the site
+====================
+
+PyBossa comes with a Cache system that it is enabled by default. PyBossa uses
+a Redis_ server to cache some objects like projects, statistics, etc. The
+system uses the Sentinel_ feature of Redis_, so you can have several
+master/slave nodes configured with Sentinel_, and your PyBossa server will use
+them "automagically".
+
+Once you have started your master Redis-server to accept connections, 
+Sentinel will manage it and its slaves. If you add a slave, Sentinel will 
+find it and start using it for load-balancing queries in PyBossa Cache system.
+
+For more details about Redis_ and Sentinel_, please, read the official documentation_.
+
+If you want to disable it, you can do it with an environment variable::
+
+    export PYBOSSA_REDIS_CACHE_DISABLED='1'
+
+Then start the server, and nothing will be cached.
+
+.. _Redis: http://redis.io/
+.. _Sentinel: http://redis.io/topics/sentinel
+.. _documentation: http://redis.io/topics/sentinel
+
+.. note::
+   **Important**: We highly recommend you to not disable the cache, as it will boost
+   the performance of the server caching SQL queries as well as page views. If
+   you have lots of projects with hundreds of tasks, you should enable it.
+
+.. note::
+   **Important**: Sometimes Redis is a bit outdated in your Linux distribution.
+   If this is the case, you will need to install it by hand, but it is really
+   easy and well documented in the official Redis_ site.
+
 Configuring the DataBase
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 You need first to add a user to your PostgreSQL_ DB::
 
     sudo su postgres
-    createuser -P tester 
+    createuser -d -P pybossa
+
+Use password ``tester`` when prompted.
 
 .. note::
     You should use the same user name that you have used in the
-    settings_local.py and alembic.ini files.    
+    settings_local.py and alembic.ini files.
 
-After running the last command, you will have to answer to these questions:
+After running the last command, you maybe also have to answer to these questions:
 
 * Shall the new role be a super user? Answer **n** (press the **n** key).
 * Shall the new role be allowed to create databases? Answer **y** (press the **y** key).
@@ -188,7 +294,7 @@ After running the last command, you will have to answer to these questions:
 
 And now, you can create the database::
 
-    createdb pybossa -O tester
+    createdb pybossa -O pybossa
 
 Finally, exit the postgresql user::
 
@@ -200,7 +306,7 @@ Then, populate the database with its tables::
 
 Run the web server::
 
-  python pybossa/web.py
+  python run.py
 
 Open in your web browser the following URL::
 
@@ -212,8 +318,11 @@ completed:
 .. image:: http://i.imgur.com/hPtgo6S.png
 
 
-Migrating the Database Table Structure
-======================================
+Updating PyBossa
+================
+
+Update PyBossa core and migrating the database table structure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Sometimes, the PyBossa developers add a new column or table to the PyBossa
 server, forcing you to carry out a **migration** of the database. PyBossa uses
@@ -221,11 +330,12 @@ Alembic_ for performing the migrations, so in case that your production server
 need to upgrade the DB structure to a new version, all you have to do is to::
 
   git pull origin master
+  pip install -r requirements.txt
   alembic upgrade head
 
 
-The first command will get you the latest source code of the server, and the
-second one will perform the migration.
+The first command will get you the latest source code. Then new libraries are
+installed or upgraded. And Alembic is upgrading the database structure.
 
 .. note::
     If you are using the virtualenv_ be sure to activate it before running the
@@ -233,24 +343,31 @@ second one will perform the migration.
 
 .. _Alembic: http://pypi.python.org/pypi/alembic
 
-Enabling a Cache
-================
 
-PyBossa comes with a Cache system (based on `flask-cache <http://packages.python.org/Flask-Cache/>`_) 
-that it is disabled by default. If you want to start caching some pages of the PyBossa server, you
-only have to modify your settings and change the following value from::
+Migrating Your Old DB Records
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    CACHE_TYPE = 'null'
+Previously, HTML was supported as the default option for the long_description
+field in apps. In new versions of PyBossa, Markdown has been adopted as the
+default option. However, you can use HTML instead of Markdown by modifying the
+default PyBossa theme or using your own forked from the default one.
 
-to::
+If you were have been using PyBossa for a while you may have apps in your
+database whose long_description is in HTML format. Hence, if you are using the default
+theme for PyBossa you will no longer see them rendered as HTML and may have some
+issues.
 
-    CACHE_TYPE = 'simple'
+In order to fix this issue, you can run a simple script to convert all the DB app's
+long_description field from HTML to Markdown, just by running the following
+commands::
 
-The cache also supports other configurations, so please, check the official
-documentation of `flask-cache <http://packages.python.org/Flask-Cache/>`_.
+  pip install -r requirements.txt
+  python cli.py markdown_db_migrate
+
+The first command will install a Python package that will handle the HTML to
+Markdown conversion, while the second one will convert your DB entries.
 
 .. note::
-   **Important**: We highly recommend you to enable the cache, as it will boost
-   the performance of the server caching SQL queries as well as page views. If
-   you have lots of applications with hundreds of tasks, you should enable it.
+    As always, if you are using the virtualenv_ be sure to activate it before
+    running the pip install command.
 

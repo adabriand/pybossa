@@ -1,17 +1,20 @@
-# This file is part of PyBOSSA.
+# -*- coding: utf8 -*-
+# This file is part of PyBossa.
 #
-# PyBOSSA is free software: you can redistribute it and/or modify
+# Copyright (C) 2013 SF Isle of Man Limited
+#
+# PyBossa is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# PyBOSSA is distributed in the hope that it will be useful,
+# PyBossa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with PyBOSSA.  If not, see <http://www.gnu.org/licenses/>.
+# along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 from flask import url_for
 
@@ -28,9 +31,9 @@ class Hateoas(object):
 
     def create_links(self, item):
         cls = item.__class__.__name__.lower()
+        links = []
         if cls == 'taskrun':
             link = self.create_link(item)
-            links = []
             if item.app_id is not None:
                 links.append(self.create_link(item.app, rel='parent'))
             if item.task_id is not None:
@@ -38,7 +41,6 @@ class Hateoas(object):
             return links, link
         elif cls == 'task':
             link = self.create_link(item)
-            links = []
             if item.app_id is not None:
                 links = [self.create_link(item.app, rel='parent')]
             return links, link
@@ -46,11 +48,14 @@ class Hateoas(object):
             return None, self.create_link(item)
         elif cls == 'app':
             link = self.create_link(item)
-            links = []
             if item.category_id is not None:
                 links.append(self.create_link(item.category, rel='category'))
             return links, link
-        else:
+        elif cls == 'user':
+            link = self.create_link(item)
+            # TODO: add the apps created by the user as the links with rel=? (maybe 'app'??)
+            return None, link
+        else: # pragma: no cover
             return False
 
     def remove_links(self, item):

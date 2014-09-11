@@ -1,46 +1,67 @@
-# This file is part of PyBOSSA.
+# -*- coding: utf8 -*-
+# This file is part of PyBossa.
 #
-# PyBOSSA is free software: you can redistribute it and/or modify
+# Copyright (C) 2013 SF Isle of Man Limited
+#
+# PyBossa is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# PyBOSSA is distributed in the hope that it will be useful,
+# PyBossa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with PyBOSSA.  If not, see <http://www.gnu.org/licenses/>.
+# along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
+
 from sqlalchemy.sql import text
-from pybossa.core import cache
-from pybossa.core import db
+from pybossa.cache import cache, delete_cached
+from pybossa.core import db, timeouts, get_session
 import pybossa.model as model
 
 
-@cache.cached(key_prefix="categories_all")
+@cache(key_prefix="categories_all",
+       timeout=timeouts.get('CATEGORY_TIMEOUT'))
 def get_all():
     """Return all categories"""
-    return db.session.query(model.Category).all()
+    try:
+        session = get_session(db, bind='slave')
+        data = session.query(model.category.Category).all()
+        return data
+    except: # pragma: no cover
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
-@cache.cached(key_prefix="categories_used")
+@cache(key_prefix="categories_used",
+       timeout=timeouts.get('CATEGORY_TIMEOUT'))
 def get_used():
     """Return categories only used by apps"""
-    sql = text('''
-               SELECT category.* FROM category, app
-               WHERE app.category_id=category.id GROUP BY category.id
-               ''')
-    results = db.engine.execute(sql)
-    categories = []
-    for row in results:
-        category = dict(id=row.id, name=row.name, short_name=row.short_name,
-                        description=row.description)
-        categories.append(category)
-    return categories
+    try:
+        sql = text('''
+                   SELECT category.* FROM category, app
+                   WHERE app.category_id=category.id GROUP BY category.id
+                   ''')
+        session = get_session(db, bind='slave')
+        results = session.execute(sql)
+        categories = []
+        for row in results:
+            category = dict(id=row.id, name=row.name, short_name=row.short_name,
+                            description=row.description)
+            categories.append(category)
+        return categories
+    except: # pragma: no cover
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def reset():
     """Clean the cache"""
-    cache.delete('categories_all')
-    cache.delete('categories_used')
+    delete_cached('categories_all')
+    delete_cached('categories_used')

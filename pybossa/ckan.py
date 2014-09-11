@@ -1,7 +1,26 @@
+# -*- coding: utf8 -*-
+# This file is part of PyBossa.
+#
+# Copyright (C) 2013 SF Isle of Man Limited
+#
+# PyBossa is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# PyBossa is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
+
 import requests
 import json
 
-from pybossa.model import Task, TaskRun
+from pybossa.model.task import Task
+from pybossa.model.task_run import TaskRun
 
 
 class Ckan(object):
@@ -134,15 +153,17 @@ class Ckan(object):
         datastore = {'resource_id': resource_id,
                      'fields': self.fields[name],
                      'indexes': self.indexes[name],
-                     'primary_key': self.primary_key[name]}
+                     'primary_key': self.primary_key[name],
+                     'force': True}
         r = requests.post(self.url + "/action/datastore_create",
                           headers=self.headers,
                           data=json.dumps(datastore))
+
         if r.status_code == 200:
             output = json.loads(r.text)
             if output['success']:
                 return output['result']
-            else:
+            else:  # pragma: no cover
                 return output
         else:
             raise Exception("CKAN: the remote site failed! datastore_create failed",
@@ -160,7 +181,8 @@ class Ckan(object):
             chunk = _records[i:i + 20]
             payload = {'resource_id': resource_id,
                        'records': chunk,
-                       'method': 'insert'}
+                       'method': 'insert',
+                       'force': True}
             r = requests.post(self.url + "/action/datastore_upsert",
                               headers=self.headers,
                               data=json.dumps(payload))
@@ -173,7 +195,7 @@ class Ckan(object):
     def datastore_delete(self, name, resource_id=None):
         #if resource_id is None:
         #    resource_id = self.get_resource_id(name)
-        payload = {'resource_id': resource_id}
+        payload = {'resource_id': resource_id, 'force': True}
         r = requests.post(self.url + "/action/datastore_delete",
                           headers=self.headers,
                           data=json.dumps(payload))

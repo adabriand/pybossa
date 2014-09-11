@@ -10,7 +10,25 @@ The RESTful API is located at::
 
 It expects and returns JSON.
 
-.. autoclass:: pybossa.api.APIBase
+.. autoclass:: pybossa.api.api_base.APIBase
+   :members:
+
+.. autoclass:: pybossa.api.AppAPI
+   :members:
+
+.. autoclass:: pybossa.api.TaskAPI
+   :members:
+
+.. autoclass:: pybossa.api.TaskRunAPI
+   :members:
+
+.. autoclass:: pybossa.api.CategoryAPI
+   :members:
+
+.. autoclass:: pybossa.api.GlobalStatsAPI
+   :members:
+
+.. autoclass:: pybossa.api.VmcpAPI
    :members:
 
 Some requests will need an **API-KEY** to authenticate & authorize the
@@ -53,11 +71,45 @@ the type of the object: task, taskrun or app.
 Apps will not have a **links** field, because these objects do not have
 parents.
 
-Tasks will have only one parent: the associated application.
+Tasks will have only one parent: the associated project (application).
 
 Task Runs will have only two parents: the associated task and associated app.
 
 .. _`Hypermedia as the Engine of Application State`: http://en.wikipedia.org/wiki/HATEOAS 
+
+
+.. _rate-limiting:
+
+Rate Limiting
+-------------
+
+Rate Limiting has been enabled for all the API endpoints (since PyBossa v2.0.1).
+The rate limiting gives any user, using the IP, **a window of 15 minutes to do at
+most 300 requests per endpoint**.
+
+This new feature includes in the headers the following values to throttle your
+requests without problems:
+
+* **X-RateLimit-Limit**: the rate limit ceiling for that given request
+* **X-RateLimit-Remaining**: the number of requests left for the 15 minute window
+* **X-RateLimit-Reset**: the remaining window before the rate limit resets in UTC epoch seconds
+
+We recommend to use the Python package **requests** for interacting with
+PyBossa, as it is really simple to check those values:
+
+.. code-block:: python
+
+    import requests
+    import time
+
+    res = requests.get('http://SERVER/api/app')
+    if int(res.headers['X-RateLimit-Remaining']) < 10:
+        time.sleep(300) # Sleep for 5 minutes
+    else:
+        pass # Do your stuff
+
+
+
 
 Operations
 ----------
@@ -71,7 +123,7 @@ List domain objects::
      
     GET http://{pybossa-site-url}/api/{domain-object}
     
-For example, you can get a list of registered applications like this::
+For example, you can get a list of registered projects (applications) like this::
 
     GET http://{pybossa-site-url}/api/app
 
@@ -83,10 +135,21 @@ For a list of TaskRuns use::
 
     GET http://{pybossa-site-url}/api/taskrun
 
+Finally, you can get a list of users by doing::
+
+    GET http://{pybossa-site-url}/api/user
+
+.. note::
+    Please, notice that in order to keep users privacy, only their locale and
+    nickname will be shared by default. Optionally, users can disable privacy
+    mode in their settings. By doing so, also their fullname and account
+    creation date will be visible for everyone through the API.
+
 .. note::
     By default PyBossa limits the list of items to 20. If you want to get more
     items, use the keyword **limit=N** with **N** being a number to get that
-    amount.
+    amount. There is a maximum of 100 to the **limit** keyword, so if you try to
+    get more items at once it won't work.
 
 .. note::
     You can use the keyword **offset=N** in any **GET** query to skip that many 
@@ -141,7 +204,8 @@ It is possible to limit the number of returned objects::
 
 .. note::
     By default all GET queries return a maximum of 20 objects unless the
-    **limit** keyword is used to get more: limit=50
+    **limit** keyword is used to get more: limit=50. However, a maximum amount
+    of 100 objects can be retrieved at once.
 
 .. note::
     If the search does not find anything, the server will return an empty JSON
@@ -171,7 +235,7 @@ If an error occurs, the action will return a JSON object like this:
         "exception_cls": "AttributeError"
     }
 
-Where **target** will refer to an App, Task or TaskRun object.
+Where **target** will refer to a Project, Task or TaskRun object.
 
 Update
 ~~~~~~
@@ -197,7 +261,7 @@ If an error occurs, the action will return a JSON object like this:
         "exception_cls": "AttributeError"
     }
 
-Where **target** will refer to an App, Task or TaskRun object.
+Where **target** will refer to a project, Task or TaskRun object.
 
 Delete
 ~~~~~~
@@ -223,7 +287,7 @@ If an error occurs, the action will return a JSON object like this:
         "exception_cls": "AttributeError"
     }
 
-Where **target** will refer to an App, Task or TaskRun object.
+Where **target** will refer to a Project, Task or TaskRun object.
 
 
 Requesting a new task for current user
@@ -238,13 +302,31 @@ This will return a domain Task object in JSON format if there is a task
 available for the user, otherwise it will return **None**.
 
 .. note::
-    Some applications will want to pre-load the next task for the current user.
+    Some projects will want to pre-load the next task for the current user.
     This is possible by passing the argument **?offset=1** to the **newtask**
     endpoint.
+
+
+Requesting the user's oAuth tokens
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A user who has registered or signed in with any of the third parties supported
+by PyBossa (currently Twitter, Facebook and Google) can request his own oAuth
+tokens by doing::
+
+    GET http://{pybossa-site-url}/api/token?api_key=API-KEY
+
+Additionally, the user can specify any of the tokens if only its retrieval is
+desired::
+
+    GET http://{pybossa-site-url}/api/token/{provider}?api_key=API-KEY
+
+Where 'provider' will be any of the third parties supported, i.e. 'twitter',
+'facebook' or 'google'.
 
 Example Usage
 -------------
 
-Create an Application object::
+Create a Project (Application) object::
 
   curl -X POST -H "Content-Type:application/json" -s -d '{"name":"myapp", "info":{"xyz":1}}' 'http://localhost:5000/api/app?api_key=API-KEY'
