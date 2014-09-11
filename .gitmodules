@@ -21,7 +21,7 @@
 	url = git://github.com/opscode-cookbooks/build-essential.git
 [submodule "pybossa/themes/default"]
 	path = pybossa/themes/default
-	url = git://github.com/PyBossa/pybossa-default-theme
+	url = git://github.com/inteligencia-coletiva-lsd/pybossa-default-theme
 [submodule "doc/_themes/sphinx-theme-pybossa"]
 	path = doc/_themes/sphinx-theme-pybossa
 	url = git://github.com/PyBossa/sphinx-theme-pybossa.git
