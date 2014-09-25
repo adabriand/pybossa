@@ -62,7 +62,10 @@ def read(taskrun=None):
 
 
 def update(taskrun):
-    return False
+    if current_user.is_anonymous():
+        return False
+    else:
+        return current_user.admin or taskrun.user.id == current_user.id
 
 
 def delete(taskrun):

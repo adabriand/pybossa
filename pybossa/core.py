@@ -169,6 +169,17 @@ def setup_babel(app):
         return lang
     return babel
 
+def get_locale():
+    lang = None
+    if current_user.is_authenticated():
+        lang = current_user.locale
+    #else:
+    #    lang = session.get('lang',
+    #                       request.accept_languages.best_match(app.config['LOCALES']))
+    if lang is None:
+        lang = 'en'
+    return lang
+
 def setup_blueprints(app):
     """Configure blueprints."""
     from pybossa.api import blueprint as api
