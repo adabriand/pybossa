@@ -31,7 +31,7 @@ from markdown import markdown
 import json
 import time
 
-from flask import Blueprint, request, url_for, flash, redirect, abort
+from flask import Blueprint, request, url_for, flash, redirect, abort, jsonify
 from flask import render_template, current_app
 from flask.ext.login import login_required, login_user, logout_user, \
     current_user
@@ -54,6 +54,9 @@ try:
 except ImportError:  # pragma: no cover
     import pickle
 
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 blueprint = Blueprint('account', __name__)
 
@@ -584,3 +587,10 @@ def reset_api_key(name):
     msg = gettext('New API-KEY generated')
     flash(msg, 'success')
     return redirect(url_for('account.profile', name=name))
+
+
+@blueprint.route('/currentUserInfo', methods=['GET', 'POST'])
+@login_required
+def currentUserInfo():
+    user = User.query.filter_by(name=current_user.name).first()
+    return jsonify(info=user.id)
