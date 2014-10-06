@@ -17,6 +17,58 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 1.3\n"
 
+#: themes/default/templates/applications/export.html:17
+msgid "Export in CSV format"
+msgstr "Exportar no formato CSV"
+
+#: themes/default/templates/applications/export.html:22
+msgid "Export in JSON format"
+msgstr "Exportar no formato JSON"
+
+#: themes/default/templates/applications/export.html:32
+msgid "Export to the"
+msgstr "Exportar para"
+
+#: themes/default/templates/applications/export.html:34
+msgid "Export to a CKAN server"
+msgstr "Exportar para um servidor CKAN"
+
+#: themes/default/templates/applications/export.html:36
+msgid "IMPORTANT"
+msgstr "IMPORTANTE"
+
+#: themes/default/templates/applications/export.html:36
+msgid "This export option stills in beta mode and may fail in the CKAN server. If you get an error, please send an e-mail to info@pybossa.com"
+msgstr "Esta opção de exportação ainda está em modo beta e pode falhar no servidor CKAN. Se você obtiver um erro, por favor envie um e-mail para info@pybossa.com"
+
+#: themes/default/templates/applications/export.html:41
+msgid "You don't have a Datahub.io API key in your"
+msgstr "Você não tem uma chave Datahub.io na conta"
+
+#: themes/default/templates/applications/export.html:41
+msgid "account"
+msgstr ""
+
+#: themes/default/templates/applications/export.html:41
+msgid "Please,"
+msgstr "Por favor,"
+
+#: themes/default/templates/applications/export.html:41
+msgid "create an account"
+msgstr "crie uma conta"
+
+#: themes/default/templates/applications/export.html:41
+msgid "and copy/paste the API key in your profile in order to use this exporter."
+msgstr "e copie/cole a chave da API em seu perfil de modo a utilizar este exportador."
+
+#: themes/default/templates/applications/update.html:14
+msgid "Update the project"
+msgstr "Atualizar projeto"
+
+#: themes/default/templates/base.html:57
+msgid "More info"
+msgstr "Mais informações"
+
 #: themes/default/templates/stats/index.html:13
 msgid "Community Leaderboard"
 msgstr "Ranking da Comunidade"
@@ -1062,8 +1114,8 @@ msgid "Distribution of Answers per Hour"
 msgstr "Distribuição das respostas por hora"
 
 #: themes/default/templates/applications/stats.html:77
-msgid "Total Answers per day"
-msgstr "Total de respostas por dia"
+msgid "Completed Tasks in the last 15 days"
+msgstr "Tarefas completadas nos últimos 15 dias"
 
 #: themes/default/templates/applications/stats.html:77
 #: themes/default/templates/applications/stats.html:148
