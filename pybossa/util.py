@@ -108,6 +108,9 @@ def pretty_date(time=False):
     from datetime import datetime
     import dateutil.parser
     now = datetime.now()
+    f = open("/tmp/teste2.log","w")
+    f.write("Cheguei:"+str(now)+" " + str(time))
+
     if type(time) is str or type(time) is unicode:
         time = dateutil.parser.parse(time)
     if type(time) is int:
@@ -121,20 +124,22 @@ def pretty_date(time=False):
     second_diff = diff.seconds
     day_diff = diff.days
 
+    f.write("tempo" + " " + str(day_diff)+" "+str(second_diff))
+    f.close()
+
     if day_diff < 0:
         return ''
-
     if day_diff == 0:
         if second_diff < 10:
-            return "just now"
+            return " just now"
         if second_diff < 60:
             return str(second_diff) + " seconds ago"
         if second_diff < 120:
-            return "a minute ago"
+            return ' '.join([str(second_diff / 60.0), "minute ago"])
         if second_diff < 3600:
             return ' '.join([str(second_diff / 60), "minutes ago"])
         if second_diff < 7200:
-            return "an hour ago"
+            return ' '.join([str(second_diff / 3600.0), "hour ago"])
         if second_diff < 86400:
             return ' '.join([str(second_diff / 3600), "hours ago"])
     if day_diff == 1:
