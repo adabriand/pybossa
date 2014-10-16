@@ -356,6 +356,8 @@ msgstr "com uma pontuação de"
 msgid "contributed tasks"
 msgstr "tarefas com contribuição"
 
+
+
 #: themes/default/templates/account/_helpers.html:57
 msgid "The user has not contributed to any tasks yet"
 msgstr "O usuário não contribuiu ainda"
@@ -862,6 +864,58 @@ msgstr "Progresso geral"
 #: themes/default/templates/applications/tasks_browse.html:19
 msgid "completed"
 msgstr "completas"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "just now"
+msgstr "agora"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "seconds ago"
+msgstr "segundo(s) atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "minute ago"
+msgstr "minuto atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "minutes ago"
+msgstr "minutos atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "hour ago"
+msgstr "hora atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "hours ago"
+msgstr "horas atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "Yesterday"
+msgstr "Ontem"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "days ago"
+msgstr "dia(s) atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "weeks ago"
+msgstr "semana(s) atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "years ago"
+msgstr "anos atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "year ago"
+msgstr "ano atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "months ago"
+msgstr "meses atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
+msgid "month ago"
+msgstr "mês atrás"
 
 #: themes/default/templates/applications/_helpers.html:64
 #: themes/default/templates/applications/_helpers.html:66
@@ -1556,6 +1610,10 @@ msgstr "Voluntários mais ativos"
 msgid "Submitted Tasks"
 msgstr "Tarefas submetidas"
 
+#: themes/default/templates/account/index.html:22
+msgid "Contributed Tasks"
+msgstr "Contribuições em Tarefas"
+
 #: themes/default/templates/home/search.html:7
 msgid "Search Results"
 msgstr "Buscar resultados"
@@ -1767,7 +1825,7 @@ msgid ""
 "Your avatar has been updated! It may                               take "
 "some minutes to refresh..."
 msgstr ""
-"Seu avatar foi atualizado! Pode demorar"
+"Seu avatar foi atualizado! Pode demorar "
 "alguns minutos para atualização..."
 
 #: view/account.py:511 view/account.py:571
@@ -1967,11 +2025,8 @@ msgid "Project updated!"
 msgstr "Projeto atualizado!"
 
 #: view/applications.py:517
-msgid ""
-"Your project thumbnail has been updated! It may"
-"                                       take some minutes to refresh..."
-msgstr "A miniatura do seu projeto foi atualizada! Pode "
-"demorar alguns minutos para atualização..."
+msgid "Your project thumbnail has been updated! It may take some minutes to refresh..."
+msgstr "A miniatura do seu projeto foi atualizada! Pode demorar alguns minutos para atualização..."
 
 #: view/applications.py:520
 msgid "You must provide a file to change the avatar"
