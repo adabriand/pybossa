@@ -34,7 +34,6 @@ class LocalUploader(Uploader):
 
     upload_folder = 'uploads'
     pybossa_path = ''
-    #pybossa_path = ''
 
     def init_app(self, app):
         """Config upload folder."""
@@ -44,27 +43,13 @@ class LocalUploader(Uploader):
 
     def _upload_file(self, file, container):
         """Upload a file into a container/folder."""
-	dat = open("/tmp/teste.log", "w")
         try:
-	    dat.write("1")
             filename = secure_filename(file.filename)
-	    dat.write("2")
-            #if not os.path.isdir(os.path.join(self.pybossa_path, self.upload_folder, container)):
             if not os.path.isdir("/home/pybossa023/pybossa/pybossa/"+self.upload_folder+os.sep+container):
-		#dat.write("tentando make"+str(os.path.join(self.pybossa_path, self.upload_folder, container))+" " + os.stat(os.path.join(self.pybossa_path)).st_mode)
-                dat.write("UID" + str(os.geteuid())+" " +str(os.stat("/home/pybossa023/pybossa")) + " " + str(os.stat("/home/pybossa023/pybossa/pybossa")))
- 		#os.makedirs(os.path.join(self.pybossa_path, self.upload_folder, container))
 		os.makedirs("/home/pybossa023/pybossa/pybossa/"+self.upload_folder+os.sep+container)
-		dat.write("2.1")
-	    dat.write("Trying to save\n")
-            #file.save(os.path.join(self.pybossa_path, self.upload_folder, container, filename))
 	    file.save("/home/pybossa023/pybossa/pybossa/"+self.upload_folder+os.sep+container+os.sep+filename)
-	    dat.write("saved")
-	    dat.close()
             return True
         except os.error as e:
-	    dat.write("Not saved"+str(e))
-	    dat.close()
             return False
 
     def delete_file(self, name, container):
