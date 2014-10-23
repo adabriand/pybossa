@@ -1,4 +1,4 @@
-# Portuguese translations for PROJECT.
+ translations for PROJECT.
 # Copyright (C) 2014 ORGANIZATION
 # This file is distributed under the same license as the PROJECT project.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2014.
@@ -870,56 +870,52 @@ msgid "just now"
 msgstr "agora"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "ago"
-msgstr "atrás"
+msgid "seconds ago"
+msgstr "segundo(s) atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "seconds"
-msgstr "segundo(s)"
+msgid "minute ago"
+msgstr "minuto atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "minute"
-msgstr "minuto"
+msgid "minutes ago"
+msgstr "minutos atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "minutes"
-msgstr "minutos"
+msgid "hour ago"
+msgstr "hora atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "hour"
-msgstr "hora"
-
-#: themes/default/templates/applications/_helpers.html:129
-msgid "hours"
-msgstr "horas"
+msgid "hours ago"
+msgstr "horas atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
 msgid "Yesterday"
 msgstr "Ontem"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "days"
-msgstr "dia(s)"
+msgid "days ago"
+msgstr "dia(s) atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "weeks"
-msgstr "semana(s)"
+msgid "weeks ago"
+msgstr "semana(s) atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "years"
-msgstr "anos"
+msgid "years ago"
+msgstr "anos atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "year"
-msgstr "ano"
+msgid "year ago"
+msgstr "ano atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "months"
-msgstr "meses"
+msgid "months ago"
+msgstr "meses atrás"
 
 #: themes/default/templates/applications/_helpers.html:129
-msgid "month"
-msgstr "mês"
+msgid "month ago"
+msgstr "mês atrás"
 
 #: themes/default/templates/applications/_helpers.html:64
 #: themes/default/templates/applications/_helpers.html:66
@@ -2029,8 +2025,11 @@ msgid "Project updated!"
 msgstr "Projeto atualizado!"
 
 #: view/applications.py:517
-msgid "Your project thumbnail has been updated! It may take some minutes to refresh..."
-msgstr "A miniatura do seu projeto foi atualizada! Pode demorar alguns minutos para atualização..."
+msgid ""
+"Your project thumbnail has been updated! It may"
+"                                       take some minutes to refresh..."
+msgstr "A miniatura do seu projeto foi atualizada! Pode "
+"demorar alguns minutos para atualização..."
 
 #: view/applications.py:520
 msgid "You must provide a file to change the avatar"
