@@ -152,6 +152,11 @@ msgid "Portuguese"
 msgstr "Português"
 
 
+#: forms/forms.py:65
+msgid "Password (leave blank for no password)"
+msgstr "Senha (deixe em branco para nenhuma alteração)"
+
+
 #: core.py:303
 msgid ""
 "Please update your e-mail address in your profile page, right now it is "
