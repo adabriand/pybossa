@@ -43,11 +43,11 @@ msgstr "Esta opção de exportação ainda está em modo beta e pode falhar no s
 
 #: themes/default/templates/applications/export.html:41
 msgid "You don't have a Datahub.io API key in your"
-msgstr "Você não tem uma chave Datahub.io na conta"
+msgstr "Você não tem uma chave Datahub.io na sua"
 
 #: themes/default/templates/applications/export.html:41
 msgid "account"
-msgstr ""
+msgstr "conta"
 
 #: themes/default/templates/applications/export.html:41
 msgid "Please,"
@@ -101,7 +101,7 @@ msgstr "progresso"
 
 #: themes/default/templates/applications/index.html:12
 msgid "Thinking"
-msgstr "Raciocínio"
+msgstr "Pensamento"
 
 #: themes/default/templates/applications/index.html:12
 msgid "Volunteer Sensing"
@@ -117,7 +117,7 @@ msgstr "Projeto(s) Rascunho"
 
 #: themes/default/templates/applications/index.html:43
 msgid "Volunteer Thinking projects"
-msgstr "Projetos de Raciocínio Voluntário"
+msgstr "Projetos de Pensamento Voluntário"
 
 #: themes/default/templates/applications/index.html:43
 msgid "Volunteer Sensing Projects"
@@ -125,11 +125,11 @@ msgstr "Projetos de Sensoriamento Voluntário"
 
 #: themes/default/templates/base.html:59
 msgid "Cookies help us deliver our services. By using our services, you agree to our use of cookies."
-msgstr "Cookies nos ajudam a oferecer nosso serviço. Usando nosso serviço você concorda com nosso uso dos cookies"
+msgstr "Cookies nos ajudam a oferecer nosso serviço. Ao usar o nosso serviço, você concorda com nosso uso dos cookies."
 
 #: themes/default/templates/home/_pybossa_text.hmtl:9
 msgid "This is an online platform that makes people help people to perform research."
-msgstr "Esta é uma plataforma que faz com que pessoas ajudem pessoas a pesquisar."
+msgstr "Esta é uma plataforma que possibilita que pessoas ajudem pessoas a pesquisar."
 
 #: themes/default/templates/home/_pybossa_text.hmtl:11
 msgid "Image classification"
