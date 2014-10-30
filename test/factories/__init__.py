@@ -26,7 +26,6 @@ def reset_all_pk_sequences():
     AppFactory.reset_sequence()
     BlogpostFactory.reset_sequence()
     CategoryFactory.reset_sequence()
-    FeaturedFactory.reset_sequence()
     TaskFactory.reset_sequence()
     TaskRunFactory.reset_sequence()
     UserFactory.reset_sequence()
@@ -38,9 +37,6 @@ class BaseFactory(SQLAlchemyModelFactory):
 
     @classmethod
     def _create(cls, target_class, *args, **kwargs):
-        """The default beahaviour is to simply add the object to the SQLAlchemy
-        session. Here, we also flush it as autoflush is disabled in the
-        flask-SQLAlchemy extension"""
         session = cls._meta.sqlalchemy_session
         obj = target_class(*args, **kwargs)
         session.add(obj)
@@ -52,7 +48,6 @@ class BaseFactory(SQLAlchemyModelFactory):
 from app_factory import AppFactory
 from blogpost_factory import BlogpostFactory
 from category_factory import CategoryFactory
-from featured_factory import FeaturedFactory
 from task_factory import TaskFactory
 from taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
 from user_factory import UserFactory

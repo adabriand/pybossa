@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # This file is part of PyBossa.
 #
-# Copyright (C) 2013 SF Isle of Man Limited
+# Copyright (C) 2014 SF Isle of Man Limited
 #
 # PyBossa is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
-from sqlalchemy import Integer, Text
-from sqlalchemy.schema import Column, ForeignKey
+#!/usr/bin/env python
+import sys
+from rq import Queue, Connection, Worker
 
-from pybossa.core import db
-from pybossa.model import DomainObject, make_timestamp
+from pybossa.core import create_app, sentinel
 
+app = create_app(run_as_server=False)
 
+# Provide queue names to listen to as arguments to this script,
+# similar to rqworker
+with app.app_context():
+    with Connection(sentinel.master):
+        qs = map(Queue, sys.argv[1:]) or [Queue()]
 
-class Featured(db.Model, DomainObject):
-    '''A Table with Featured Projects.'''
-
-    __tablename__ = 'featured'
-
-    id = Column(Integer, primary_key=True)
-    created = Column(Text, default=make_timestamp)
-    app_id = Column(Integer, ForeignKey('app.id'))
+        w = Worker(qs)
+        w.work()

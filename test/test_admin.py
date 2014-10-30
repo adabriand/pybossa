@@ -140,32 +140,32 @@ class TestAdmin(web.Helper):
         res = self.app.post('/admin/featured/1')
         f = json.loads(res.data)
         assert f['id'] == 1, f
-        assert f['app_id'] == 1, f
-        # Check that it is listed in the front page
-        res = self.app.get('/', follow_redirects=True)
-        assert "Sample Project" in res.data,\
-            "The application should be listed in the front page"\
-            " as it is featured"
+        assert f['featured'] == True, f
+        # Check can be removed from featured
+        res = self.app.get('/admin/featured', follow_redirects=True)
+        assert "Remove from Featured!" in res.data,\
+            "The project should have a button to remove from featured"
         # A retry should fail
         res = self.app.post('/admin/featured/1')
         err = json.loads(res.data)
-        err_msg = "App.id 1 alreay in Featured table"
+        err_msg = "App.id 1 already featured"
         assert err['error'] == err_msg, err_msg
         assert err['status_code'] == 415, "Status code should be 415"
 
         # Remove it again from the Featured list
         res = self.app.delete('/admin/featured/1')
-        assert res.status == "204 NO CONTENT", res.status
-        # Check that it is not listed in the front page
-        res = self.app.get('/', follow_redirects=True)
-        assert "Sample Project" not in res.data,\
-            "The application should not be listed in the front page"\
-            " as it is not featured"
+        f = json.loads(res.data)
+        assert f['id'] == 1, f
+        assert f['featured'] == False, f
+        # Check that can be added to featured
+        res = self.app.get('/admin/featured', follow_redirects=True)
+        assert "Add to Featured!" in res.data,\
+            "The project should have a button to add to featured"
         # If we try to delete again, it should return an error
         res = self.app.delete('/admin/featured/1')
         err = json.loads(res.data)
-        assert err['status_code'] == 404, "Project should not be found"
-        err_msg = 'App.id 1 is not in Featured table'
+        assert err['status_code'] == 415, "Project should not be found"
+        err_msg = 'App.id 1 is not featured'
         assert err['error'] == err_msg, err_msg
 
         # Try with an id that does not exist
