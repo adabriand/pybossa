@@ -26,8 +26,8 @@ def create(app=None):
 def read(app=None):
     if app is None:
         return True
-    if app.hidden:
-        return _only_admin_or_owner(app)
+#    if app.hidden:
+#        return _only_admin_or_owner(app)
     return True
 
 

@@ -161,6 +161,10 @@ def user_progress(app_id=None, short_name=None):
         elif app_id:
             app = _retrieve_app(app_id=app_id)
         if app:
+            
+            # Identify the current user
+            fb_user_id = request.args.get('facebook_user_id')
+            
             # get done tasks from DB
             if fb_user_id != None:
                 fb_api = UserFbAPI()
