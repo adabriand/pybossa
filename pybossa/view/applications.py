@@ -385,7 +385,7 @@ def update(short_name):
         form = AppUpdateForm(obj=app)
         upload_form = AvatarUploadForm()
         categories = db.session.query(model.category.Category).all()
-        form.category_id.choices = [(c.id, c.name) for c in categories]
+        form.category_id.choices = [(c.id, gettext(c.name)) for c in categories]
         if app.category_id is None:
             app.category_id = categories[0].id
         form.populate_obj(app)
@@ -394,7 +394,7 @@ def update(short_name):
         upload_form = AvatarUploadForm()
         form = AppUpdateForm(request.form)
         categories = cached_cat.get_all()
-        form.category_id.choices = [(c.id, c.name) for c in categories]
+        form.category_id.choices = [(c.id, gettext(c.name)) for c in categories]
 
         if request.form.get('btn') != 'Upload':
             if form.validate():
