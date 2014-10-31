@@ -100,8 +100,18 @@ msgid "progress"
 msgstr "progresso"
 
 #: themes/default/templates/applications/index.html:12
+#: themes/default/templates/admin/categories.html:35
 msgid "Thinking"
 msgstr "Pensamento"
+
+#: themes/default/templates/applications/index.html:12
+#: themes/default/templates/admin/categories.html:35
+msgid "Sensing"
+msgstr "Sensoriamento"
+
+#: themes/default/templates/admin/categories.html:35
+msgid "Projects evolving"
+msgstr "Projetos em evolução"
 
 #: themes/default/templates/applications/index.html:12
 msgid "Volunteer Sensing"

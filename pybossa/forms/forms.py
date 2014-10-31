@@ -303,7 +303,7 @@ class SearchForm(Form):
 
 
 class CategoryForm(Form):
-    id = IntegerField(label=None, widget=HiddenInput())
+    #id = IntegerField(label=None, widget=HiddenInput())
     name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
                       pb_validator.Unique(db.session, Category, Category.name,
