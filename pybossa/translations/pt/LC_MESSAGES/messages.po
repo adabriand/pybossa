@@ -120,6 +120,10 @@ msgid "Volunteer Thinking projects"
 msgstr "Projetos de Pensamento Voluntário"
 
 #: themes/default/templates/applications/index.html:43
+msgid "Applications where you can help using your skills"
+msgstr "Projetos nos quais você colabora usando seu raciocínio"
+
+#: themes/default/templates/applications/index.html:43
 msgid "Volunteer Sensing Projects"
 msgstr "Projetos de Sensoriamento Voluntário"
 
@@ -911,6 +915,11 @@ msgid "weeks"
 msgstr "semana(s)"
 
 #: themes/default/templates/applications/_helpers.html:129
+#: util.py:146
+msgid "%(value)s weeks ago"
+msgstr "%(value)s semana(s) atrás"
+
+#: themes/default/templates/applications/_helpers.html:129
 msgid "years"
 msgstr "anos"
 
@@ -1536,7 +1545,7 @@ msgstr "Forneça uma URL para uma Google Drive com dados para"
 
 #: themes/default/templates/home/_about.html:7
 msgid "This is a free, open-source platform, such as"
-msgstr "Esta é uma plataforma gratuita, 100% código aberto, como o"
+msgstr "Esta é uma plataforma gratuita, 100%% código aberto, como o"
 
 #: themes/default/templates/home/_about.html:7
 msgid "powered by"
