@@ -33,7 +33,6 @@ class LocalUploader(Uploader):
     """Local filesystem uploader class."""
 
     upload_folder = 'uploads'
-    pybossa_path = ''
 
     def init_app(self, app):
         """Config upload folder."""
@@ -45,9 +44,9 @@ class LocalUploader(Uploader):
         """Upload a file into a container/folder."""
         try:
             filename = secure_filename(file.filename)
-            if not os.path.isdir("/home/pybossa023/pybossa/pybossa/"+self.upload_folder+os.sep+container):
-		os.makedirs("/home/pybossa023/pybossa/pybossa/"+self.upload_folder+os.sep+container)
-	    file.save("/home/pybossa023/pybossa/pybossa/"+self.upload_folder+os.sep+container+os.sep+filename)
+            if not os.path.isdir(os.path.join(self.upload_folder, container)):
+                os.makedirs(os.path.join(self.upload_folder, container))
+            file.save(os.path.join(self.upload_folder, container, filename))
             return True
         except os.error as e:
             return False
@@ -55,7 +54,7 @@ class LocalUploader(Uploader):
     def delete_file(self, name, container):
         """Delete file from filesystem."""
         try:
-            path = os.path.join(self.pybossa_path, self.upload_folder, container, name)
+            path = os.path.join(self.upload_folder, container, name)
             os.remove(path)
             return True
         except:
