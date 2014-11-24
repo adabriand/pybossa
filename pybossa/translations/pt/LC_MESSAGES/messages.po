@@ -17,6 +17,22 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 1.3\n"
 
+#: themes/default/templates/account/public_profile.html:19
+msgid "Created Projects"
+msgstr "Projetos Criados"
+
+#: themes/default/templates/account/public_profile.html:24
+msgid "Contributions"
+msgstr "Contribuições"
+
+#: themes/default/templates/admin/index.html:50
+msgid "Background Jobs"
+msgstr "Jobs em Segundo Plano"
+
+#: themes/default/templates/admin/index.html:51
+msgid "Monitor the background jobs"
+msgstr "Monitore os jobs em segundo plano"
+
 #: themes/default/templates/applications/export.html:17
 msgid "Export in CSV format"
 msgstr "Exportar no formato CSV"
@@ -226,7 +242,7 @@ msgid "A cookie is a small piece of text sent to your browser by a website you v
 msgstr "Um cookie é um pequeno texto enviado a seu navegador pelo website que você visita. Este texto ajuda o website a lembrar informações sobre sua visita, como sua língua e configurações preferidas. Isto facilita sua próxima visita e a torna melhor! Cookies têm um papel importantíssimo no funcionamento da Web."
 
 #: themes/default/templates/help/_cookies_policy.html:6
-msgid "In the following video from Google, you can see a very good explanation about how cookies work:"
+msgid "In the following video from Google,  you can see a very good explanation about how cookies work:"
 msgstr "No vídeo abaixo, obtido da Google, você pode entender um pouco mais como os cookies funcionam:"
 
 #: themes/default/templates/help/_cookies_policy.html:9
@@ -1134,34 +1150,8 @@ msgid "Project slug:"
 msgstr "Nome curto do projeto:"
 
 #: themes/default/templates/applications/new.html:19
-msgid ""
-"Explain your project"
-"                                                             \n"
-"                · Why? Why you are creating this project, what you want "
-"to achieve with it"
-"                                                             \n"
-"                · How? Explain how your project works"
-"                                                             \n"
-"                · How you can help: Explain to the volunteers how they "
-"can help and contribute to the goal of your project"
-"                                                             \n"
-"                · Will you help make a difference? Explain to the "
-"volunteers why their contribution is essential and how the result of your"
-" project can help change things!"
-"                                                             \n"
-"            (you can use Markdown to give format to your description!)"
-msgstr "Explique seu projeto"
-"                · Por quê? Por que vocês está criando este projeto? O que deseja alcançar "
-"com ele"
-"                                                             \n"
-"                · Como? Explique como seu projeto funciona "
-"                                                             \n"
-"                · Como você pode contribuir: Explique aos voluntários como contribuir "
-"para o objetivo do seu projeto"
-"                                                             \n"
-"                · Sua ajuda fará a diferença? Explique aos"
-"voluntários porque suas contribuições são essenciais e como o resultado do "
-" projeto pode mudar as coisas!"
+msgid "Explain your project                                                             - Why? Why you are creating this project, what you want to achieve with it                                                             - How? Explain how your project works                                                             - How you can help: Explain to the volunteers how they can help and contribute to the goal of your project                                                             - Will you help make a difference? Explain to the volunteers why their contribution is essential and how the result of your project can help change things!                                                             (you can use Markdown to give format to your description!)"
+msgstr "Explique seu projeto                                                             - Por quê? Por que você está criando este projeto, o que você deseja alcançar                                                             - Como? Explique como seu projeto funciona                                                             - Como ajudar: explique aos voluntários como eles podem contribuir para o objetivo do seu projeto                                                             - Você ajudará a fazer a diferença? Explique aos voluntários porque sua contribuição é essencial e como o resultado do seu projeto pode mudar as coisas!                                                             (você pode utilizar Markdown para formatar sua descrição!)"
 
 
 #: themes/default/templates/applications/new.html:26
@@ -1636,11 +1626,11 @@ msgstr "Voluntários mais ativos"
 
 #: themes/default/templates/home/index.html:80
 msgid "Submitted Tasks"
-msgstr "Tarefas submetidas"
+msgstr "Tarefas realizadas"
 
 #: themes/default/templates/account/index.html:22
 msgid "Contributed Tasks"
-msgstr "Contribuições em Tarefas"
+msgstr "Tarefas realizadas"
 
 #: themes/default/templates/home/search.html:7
 msgid "Search Results"

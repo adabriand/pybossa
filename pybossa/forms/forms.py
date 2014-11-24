@@ -60,7 +60,7 @@ class AppUpdateForm(AppForm):
         lazy_gettext('Allow Anonymous Contributors'),
         choices=[('True', lazy_gettext('Yes')),
                  ('False', lazy_gettext('No'))])
-    category_id = SelectField(lazy_gettext('Category'), coerce=int)
+    category_id = SelectField(lazy_gettext('Category'), id='category', coerce=int)
     hidden = BooleanField(lazy_gettext('Hide?'))
     password = TextField(lazy_gettext('Password (leave blank for no password)'))
 
