@@ -17,6 +17,113 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 1.3\n"
 
+<<<<<<< HEAD
+=======
+#: themes/default/templates/applications/tasks/csv.html:3
+msgid "Provide a public link to your own CSV file"
+msgstr "Forneça um link público para seu arquivo CSV"
+
+#: themes/default/templates/applications/tasks/csv.html:5
+msgid "Use the CSV URL\n      template"
+msgstr "Use o modelo do CSV"
+
+#: themes/default/templates/applications/tasks/epicollect.html:2
+msgid "EpiCollect Plus Project"
+msgstr "Projeto EpiCollect Plus"
+
+#: themes/default/templates/applications/tasks/epicollect.html:3
+msgid "Use an EpiCollect Plus project"
+msgstr "Forneça os dados de um projeto EpiCollect Plus"
+
+#: themes/default/templates/applications/tasks/epicollect.html:5
+msgid "Use an EpiCollect\n      Plus project"
+msgstr "Use um projeto EpiCollect Plus"
+
+#: themes/default/templates/applications/tasks/gdocs-spreadsheet.html:2
+msgid "Google Drive Spreadsheet"
+msgstr "Planilha do Google Drive"
+
+#: themes/default/templates/applications/tasks/gdocs-spreadsheet.html:3
+msgid "Import a Google Drive Spreadsheet"
+msgstr "Importe uma planilha do Google Drive"
+
+#: themes/default/templates/applications/tasks/gdocs-spreadsheet.html:5
+msgid "Use the Google Drive\n      template"
+msgstr "Use um modelo do Google Drive"
+
+#: themes/default/templates/applications/tasks/gdocs-video.html:2
+msgid "Video Pattern Recognition"
+msgstr "Reconhecimento de Padrões de Vídeo"
+
+#: themes/default/templates/applications/tasks/gdocs-video.html:3
+msgid "Re-use the Vimeo task template"
+msgstr "Reuse o modelo de tarefa do Vimeo"
+
+#: themes/default/templates/applications/tasks/gdocs-video.html:5
+msgid "Use the\n      Video Task template"
+msgstr "Use o modelo de tarefa de vídeo"
+
+#: themes/default/templates/applications/tasks/gdocs-sound.html:2
+msgid "Sound Pattern Recognition"
+msgstr "Reconhecimento de Padrões de Aúdio"
+
+#: themes/default/templates/applications/tasks/gdocs-sound.html:3
+msgid "Re-use the SoundCloud task template"
+msgstr "Reuse o modelo de tarefa do SoundCloud"
+
+#: themes/default/templates/applications/tasks/gdocs-sound.html:5
+msgid "Use the\n      Sound Task template"
+msgstr "Use o modelo de tarefa de som"
+
+#: themes/default/templates/applications/tasks/gdocs-image.html:2
+msgid "Image Pattern Recognition"
+msgstr "Reconhecimento de Padrões de Imagens"
+
+#: themes/default/templates/applications/tasks/gdocs-image.html:3
+msgid "Re-use the Flickr Person Finder task template"
+msgstr "Reuse o modelo de tarefa do Flickr Person Finder"
+
+#: themes/default/templates/applications/tasks/gdocs-image.html:5
+msgid "Use the\n      Image Task template"
+msgstr "Use o modelo de tarefa de imagens"
+
+#: themes/default/templates/applications/tasks/gdocs-pdf.html:2
+msgid "Transcribing documents"
+msgstr "Transcrição de documentos"
+
+#: themes/default/templates/applications/tasks/gdocs-pdf.html:3
+msgid "Re-use the PDF transcription template"
+msgstr "Reuse o modelo de transcrição de PDF"
+
+#: themes/default/templates/applications/tasks/gdocs-pdf.html:5
+msgid "Use the\n      Transcription template"
+msgstr "Use o modelo de transcrição"
+
+#: themes/default/templates/applications/tasks/gdocs-map.html:2
+msgid "Geo-coding"
+msgstr "Geocodificação"
+
+#: themes/default/templates/applications/tasks/gdocs-map.html:3
+msgid "Re-use the Urban Park Task template"
+msgstr "Reuse o modelo de tarefas de parques urbanos"
+
+#: themes/default/templates/applications/tasks/gdocs-map.html:5
+msgid "Use the\n      Mapping template"
+msgstr "Use o modelo de cartografia"
+
+#: themes/default/templates/applications/tasks/options.html:3
+msgid "Use one of the following available"
+msgstr "Use um dos"
+
+#: themes/default/templates/applications/tasks/options.html:4
+msgid "templates"
+msgstr "modelos"
+
+#: themes/default/templates/applications/tasks/options.html:4
+msgid "to import tasks"
+msgstr "para importar tarefas"
+
+>>>>>>> 07b54401fb8004cf5af64ea5069c8b0432fe5a33
 #: themes/default/templates/account/public_profile.html:19
 msgid "Created Projects"
 msgstr "Projetos Criados"

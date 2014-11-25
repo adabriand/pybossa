@@ -295,8 +295,8 @@ def get_users_page(page, per_page=24):
     offset = (page - 1) * per_page
     sql = text('''SELECT "user".id, "user".name, "user".fullname, "user".email_addr,
                "user".created, "user".info, COUNT(task_run.id) AS task_runs
-               FROM task_run, "user"
-               WHERE "user".id=task_run.user_id GROUP BY "user".id
+               FROM "user" LEFT OUTER JOIN task_run ON ("user".id = task_run.user_id)
+               GROUP BY "user".id
                ORDER BY "user".created DESC LIMIT :limit OFFSET :offset''')
     results = db.slave_session.execute(sql, dict(limit=per_page, offset=offset))
     accounts = []
@@ -307,7 +307,6 @@ def get_users_page(page, per_page=24):
                     registered_ago=pretty_date(row.created))
         accounts.append(user)
     return accounts
-
 
 def delete_user_summary(name):
     """Delete from cache the user summary."""
