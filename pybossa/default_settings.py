@@ -38,7 +38,7 @@ LOGO = ''
 LOCALES = ['en', 'es']
 
 ## Default THEME
-THEME = 'default'
+THEME = 'contribua-theme'
 
 ## Default number of apps per page
 APPS_PER_PAGE = 20
@@ -86,4 +86,4 @@ PER = 15 * 60
 PASSWD_COOKIE_TIMEOUT = 60 * 30
 
 # Disable new account confirmation (via email)
-ACCOUNT_CONFIRMATION_DISABLED = True
+ACCOUNT_CONFIRMATION_DISABLED = False

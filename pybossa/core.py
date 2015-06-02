@@ -189,6 +189,7 @@ def setup_babel(app):
         #                       request.accept_languages.best_match(app.config['LOCALES']))
         if lang is None:
             lang = 'pt' #Default language changed to Portuguese
+        #return 'pt'
         return lang
     return babel
 

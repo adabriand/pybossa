@@ -28,6 +28,7 @@ This module exports the following endpoints:
 """
 from itsdangerous import BadData
 from markdown import markdown
+from flask_babel import get_locale
 import json
 import time
 
@@ -47,6 +48,13 @@ from pybossa.util import get_user_signup_method
 from pybossa.cache import users as cached_users
 from pybossa.cache import apps as cached_apps
 from pybossa.auth import require
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.header import Header
+from email import encoders
+from email.utils import formataddr
 
 from pybossa.forms.account_view_forms import *
 
@@ -182,12 +190,33 @@ def register():
         confirm_url = url_for('.confirm_account', key=key, _external=True)
         if current_app.config.get('ACCOUNT_CONFIRMATION_DISABLED'):
             return redirect(confirm_url)
-        msg = Message(subject='Welcome to %s!' % current_app.config.get('BRAND'),
-                          recipients=[account['email_addr']])
-        msg.body = render_template('/account/email/validate_account.md',
-                                    user=account, confirm_url=confirm_url)
-        msg.html = markdown(msg.body)
-        mail.send(msg)
+        if str(get_locale()) == 'pt':
+            temp = '/account/email/validate_account_br.md'
+        else:
+            temp = '/account/email/validate_account.md'
+        html = render_template(temp, user=account, confirm_url=confirm_url)
+        
+        msg = MIMEMultipart('alternative')
+
+        sender_name = 'Contribua.org'
+        sender_addr = 'contribua@lsd.ufcg.edu.br'
+
+        subject = 'Bem vindo ao %s!' % current_app.config.get('BRAND')
+                        
+        receiver = account['email_addr']
+
+        sender_name = Header(sender_name, 'utf-8').encode()
+
+        msg['Subject'] = Header(subject, 'utf-8')
+        msg['From'] = formataddr((sender_name, sender_addr))
+        msg['To'] = receiver
+
+        part2 = MIMEText(html, 'html')
+        msg.attach(part2)
+        s = smtplib.SMTP('localhost')
+        s.sendmail(msg['From'], msg['To'], msg.as_string())
+        s.quit()
+        
         return render_template('account/account_validation.html')
     if request.method == 'POST' and not form.validate():
         flash(gettext('Please correct the errors'), 'error')
@@ -515,30 +544,54 @@ def forgot_password():
                     .filter_by(email_addr=form.email_addr.data)\
                     .first()
         if user and user.email_addr:
-            msg = Message(subject='Account Recovery',
-                          recipients=[user.email_addr])
             if user.twitter_user_id:
-                msg.body = render_template(
-                    '/account/email/forgot_password_openid.md',
-                    user=user, account_name='Twitter')
+                if str(get_locale()) == 'pt':
+                    temp = '/account/email/forgot_password_openid_br.md'
+                else:
+                    temp = '/account/email/forgot_password_openid.md'
+                html = render_template(temp, user=user, account_name='Twitter')
             #elif user.facebook_user_id:
             #    msg.body = render_template(
             #        '/account/email/forgot_password_openid.md',
             #        user=user, account_name='Facebook')
             elif user.google_user_id:
-                msg.body = render_template(
-                    '/account/email/forgot_password_openid.md',
-                    user=user, account_name='Google')
+                if str(get_locale()) == 'pt':
+                    temp = '/account/email/forgot_password_openid_br.md'
+                else:
+                    temp = '/account/email/forgot_password_openid.md'
+                html = render_template(temp, user=user, account_name='Google')
             else:
                 userdict = {'user': user.name, 'password': user.passwd_hash}
                 key = signer.dumps(userdict, salt='password-reset')
                 recovery_url = url_for('.reset_password',
                                        key=key, _external=True)
-                msg.body = render_template(
-                    '/account/email/forgot_password.md',
-                    user=user, recovery_url=recovery_url)
-            msg.html = markdown(msg.body)
-            mail.send(msg)
+                if str(get_locale()) == 'pt':
+                    temp = '/account/email/forgot_password_br.md'
+                else:
+                    temp = '/account/email/forgot_password.md'
+                html = render_template(temp, user=user, recovery_url=recovery_url)
+	    msg = MIMEMultipart('alternative')
+
+            sender_name = 'Contribua.org'
+            sender_addr = 'contribua@lsd.ufcg.edu.br'
+
+            subject = 'Recuperação de Conta'
+                        
+            receiver = user.email_addr
+
+            sender_name = Header(sender_name, 'utf-8').encode()
+
+            msg['Subject'] = Header(subject, 'utf-8')
+            msg['From'] = formataddr((sender_name, sender_addr))
+            msg['To'] = receiver
+
+            part2 = MIMEText(html, 'html')
+            msg.attach(part2)
+
+            s = smtplib.SMTP('localhost')
+            s.sendmail(msg['From'], msg['To'], msg.as_string())
+            s.quit()
+	
             flash(gettext("We've send you email with account "
                           "recovery instructions!"),
                   'success')

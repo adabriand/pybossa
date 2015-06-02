@@ -562,6 +562,7 @@ def _import_task(app, importer, form):
             task = model.task.Task(app_id=app.id)
             [setattr(task, k, v) for k, v in task_data.iteritems()]
             data = db.session.query(model.task.Task).filter_by(app_id=app.id).filter_by(info=task.info).first()
+
             if data is None:
                 db.session.add(task)
                 db.session.commit()

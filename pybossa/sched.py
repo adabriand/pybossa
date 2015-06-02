@@ -87,6 +87,16 @@ def get_breadth_first_task(app_id, user_id=None, user_ip=None, n_answers=30, off
     # ignore n_answers for the present - we will just keep going once we've
     # done as many as we need
     tasks = [x[0] for x in tasks]
+    #dados = open("/tmp/dados.log", "w")
+    #for task in tasks:
+    #      dados.write(str(len(task.taskcount))+"\n")
+    #dados.write(">>>> Sorted\n")
+    #tasks.sort(key=lambda a: len(a.taskcount))
+    #for task in tasks:
+    #      dados.write(str(len(task.taskcount))+"\n")
+    #dados.close()
+
+
     if tasks:
         if (offset == 0):
             return db.slave_session.query(Task).get(tasks[0])
@@ -133,6 +143,7 @@ def get_random_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
     candidate_tasks = get_candidate_tasks(app_id, user_id, user_ip, n_answers, offset=0)
     total_remaining = len(candidate_tasks)
     #print "Available tasks %s " % total_remaining
+
     if total_remaining == 0:
         return None
     else:
@@ -174,7 +185,7 @@ def get_candidate_tasks(app_id, user_id=None, user_ip=None, n_answers=30, offset
                      (SELECT task_id FROM task_run WHERE
                      app_id=:app_id AND user_id=:user_id AND task_id=task.id)
                      AND app_id=:app_id AND state !='completed'
-                     ORDER BY priority_0 DESC, id ASC LIMIT 10''')
+                     ORDER BY priority_0 DESC, id ASC LIMIT 100''')
         rows = db.slave_session.execute(query, dict(app_id=app_id, user_id=user_id))
     else:
         if not user_ip:
@@ -184,7 +195,7 @@ def get_candidate_tasks(app_id, user_id=None, user_ip=None, n_answers=30, offset
                      (SELECT task_id FROM task_run WHERE
                      app_id=:app_id AND user_ip=:user_ip AND task_id=task.id)
                      AND app_id=:app_id AND state !='completed'
-                     ORDER BY priority_0 DESC, id ASC LIMIT 10''')
+                     ORDER BY priority_0 DESC, id ASC LIMIT 100''')
         rows = db.slave_session.execute(query, dict(app_id=app_id, user_ip=user_ip))
 
     tasks = []
