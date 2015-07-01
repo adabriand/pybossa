@@ -215,7 +215,7 @@ def setup_babel(app):
     babel.init_app(app)
 
     @babel.localeselector
-<<<<<<< HEAD
+
     def get_locale():
 	lang = None
         if current_user.is_authenticated():
