@@ -22,23 +22,25 @@ from pybossa.core import db, timeouts
 import pybossa.model as model
 
 
+session = db.slave_session
+
 @cache(key_prefix="categories_all",
        timeout=timeouts.get('CATEGORY_TIMEOUT'))
 def get_all():
     """Return all categories"""
-    data = db.slave_session.query(model.category.Category).all()
+    data = session.query(model.category.Category).all()
     return data
 
 
 @cache(key_prefix="categories_used",
        timeout=timeouts.get('CATEGORY_TIMEOUT'))
 def get_used():
-    """Return categories only used by apps"""
+    """Return categories only used by projects"""
     sql = text('''
-               SELECT category.* FROM category, app
-               WHERE app.category_id=category.id GROUP BY category.id
+               SELECT category.* FROM category, project
+               WHERE project.category_id=category.id GROUP BY category.id
                ''')
-    results = db.slave_session.execute(sql)
+    results = session.execute(sql)
     categories = []
     for row in results:
         category = dict(id=row.id, name=row.name, short_name=row.short_name,

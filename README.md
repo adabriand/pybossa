@@ -1,9 +1,12 @@
-[![Travis CI](https://travis-ci.org/PyBossa/pybossa.png?branch=master)](https://travis-ci.org/#!/PyBossa/pybossa)  [![Coverage Status](https://coveralls.io/repos/PyBossa/pybossa/badge.png)](https://coveralls.io/r/PyBossa/pybossa?branch=master)
+[![Build
+Status](https://travis-ci.org/PyBossa/pybossa.svg?branch=master)](https://travis-ci.org/PyBossa/pybossa) [![Code Health](https://landscape.io/github/PyBossa/pybossa/master/landscape.svg)](https://landscape.io/github/PyBossa/pybossa/master) [![Coverage
+Status](https://img.shields.io/coveralls/PyBossa/pybossa.svg)](https://coveralls.io/r/PyBossa/pybossa?branch=master)
+[![Documentation](https://readthedocs.org/projects/pybossa/badge/?version=latest)](http://docs.pybossa.com) [![License](http://img.shields.io/badge/license-agplv3-b75bb6.svg)](http://www.gnu.org/licenses/agpl-3.0.html) [![Slack](http://slackin.crowdcrafting.org/badge.svg)](http://slackin.crowdcrafting.org) [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.17516.svg)](https://zenodo.org/record/17516)
 
 PyBossa is an open source platform for crowd-sourcing online (volunteer)
 assistance to perform tasks that require human cognition, knowledge or
 intelligence (e.g. image classification, transcription, information location
-etc). 
+etc).
 
 ![Shuttleworth Foundation Funded](http://pybossa.com/assets/img/shuttleworth-funded.png)
 
@@ -14,16 +17,16 @@ crowd-source human problem-solving skills!
 
 # See it in Action
 
-PyBossa powers [CrowdCrafting.org](http://crowdcrafting.org/) and [ForestWatchers.net](http://forestwatchers.net)
+PyBossa powers [Crowdcrafting.org](http://crowdcrafting.org/) and [MicroPast](http://crowdsourced.micropasts.org/) a joint project by British Museum and University College of London.
 
 # Installing and Upgrading
 
 **Important: if you are updating a server, please, be sure to check the
 Database Migration scripts, as new changes could introduce new tables,
-columns, etc, in the DB model. See the [Migration Section](http://docs.pybossa.com/en/latest/install.html#migrating-the-database-table-structure) from the
+columns, etc, in the DB model. See the [Updating Section](http://docs.pybossa.com/en/latest/install.html#updating-pybossa) from the
 documentation**
 
-See [installation instructions](http://docs.pybossa.com/en/latest/install.html).
+See [installation instructions](http://docs.pybossa.com/en/latest/installing_pybossa.html).
 
 # Running Tests
 
@@ -55,7 +58,7 @@ It has the instructions to become a contributor.
 
 ## Copyright / License
 
-Copyright 2014 SF Isle of Man Limited. 
+Copyright 2014 SF Isle of Man Limited.
 
 Source Code License: The GNU Affero General Public License, either version 3 of the License
 or (at your option) any later version. (see COPYING file)

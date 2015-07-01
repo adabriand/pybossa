@@ -16,56 +16,49 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
-from flask.ext.login import current_user
-from pybossa.core import db
-from pybossa.model.task_run import TaskRun
 from flask import abort
-from sqlalchemy.sql import text
 
-def create(taskrun=None):
-    authorized = False
-    session = db.slave_session
-    if taskrun.user_ip:
-        sql = text('''SELECT COUNT(task_run.id) AS n_task_runs FROM task_run
-                      WHERE task_run.app_id=:app_id AND
-                      task_run.task_id=:task_id AND
-                      task_run.user_ip=:user_ip;''')
-        results = session.execute(sql, dict(app_id=taskrun.app_id,
-                                            task_id=taskrun.task_id,
-                                            user_ip=taskrun.user_ip))
-    elif taskrun.user_id:
-        sql = text('''SELECT COUNT(task_run.id) AS n_task_runs FROM task_run
-                      WHERE task_run.app_id=:app_id AND
-                      task_run.task_id=:task_id AND
-                      task_run.user_id=:user_id;''')
-        results = session.execute(sql, dict(app_id=taskrun.app_id,
-                                            task_id=taskrun.task_id,
-                                            user_id=taskrun.user_id))
-    else:
+
+class TaskRunAuth(object):
+
+    def __init__(self, task_repo, project_repo):
+        self.task_repo = task_repo
+        self.project_repo = project_repo
+
+    def can(self, user, action, taskrun=None):
+        action = ''.join(['_', action])
+        return getattr(self, action)(user, taskrun)
+
+    def update(taskrun):
+        if current_user.is_anonymous():
+            return False
+        else:
+            return current_user.admin or taskrun.user.id == current_user.id
+
+    def _create(self, user, taskrun):
+        project_id = self.task_repo.get_task(taskrun.task_id).project_id
+        project = self.project_repo.get(project_id)
+        if (user.is_anonymous() and
+                project.allow_anonymous_contributors is False):
+            return False
+        authorized = self.task_repo.count_task_runs_with(
+            project_id=taskrun.project_id,
+            task_id=taskrun.task_id,
+            user_id=taskrun.user_id,
+            user_ip=taskrun.user_ip) <= 0
+        if not authorized:
+            raise abort(403)
+        return authorized
+
+    def _read(self, user, taskrun=None):
+        return True
+
+    def _update(self, user, taskrun):
         return False
-    n_task_runs = 0
-    for row in results:
-        n_task_runs = row.n_task_runs
-    authorized = (n_task_runs <= 0)
-    if not authorized:
-        raise abort(403)
-    return authorized
 
-def read(taskrun=None):
-    return True
-
-
-def update(taskrun):
-    if current_user.is_anonymous():
-        return False
-    else:
-        return current_user.admin or taskrun.user.id == current_user.id
-
-
-def delete(taskrun):
-    if current_user.is_anonymous():
-        return False
-    if taskrun.user_id is None:
-        return current_user.admin
-    return current_user.admin or taskrun.user_id == current_user.id
-
+    def _delete(self, user, taskrun):
+        if user.is_anonymous():
+            return False
+        if taskrun.user_id is None:
+            return user.admin
+        return user.admin or taskrun.user_id == user.id

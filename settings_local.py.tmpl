@@ -58,7 +58,7 @@ CONTACT_TWITTER = 'PyBossa'
 
 ## Supported Languages
 
-LOCALES = ['en', 'es', 'fr']
+LOCALES = ['en', 'es', 'fr', 'de', 'it']
 
 ## list of administrator emails to which error emails get sent
 # ADMINS = ['me@sysadmin.org']
@@ -101,10 +101,11 @@ ENFORCE_PRIVACY = False
 REDIS_CACHE_ENABLED = True
 REDIS_SENTINEL = [('localhost', 26379)]
 REDIS_MASTER = 'mymaster'
+REDIS_DB = 0
 REDIS_KEYPREFIX = 'pybossa_cache'
 
 ## Allowed upload extensions
-ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif']
+ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'zip']
 
 ## If you want to use the local uploader configure which folder
 UPLOAD_METHOD = 'local'
@@ -119,9 +120,19 @@ UPLOAD_FOLDER = 'uploads'
 # LEADERBOARD = 20
 ## Default shown presenters
 # PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf"]
+# Default Google Docs spreadsheet template tasks URLs
+TEMPLATE_TASKS = {
+    'image': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE&usp=sharing",
+    'sound': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc&usp=sharing",
+    'video': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdGZ2UGhxSTJjQl9YNVhfUVhGRUdoRWc&usp=sharing",
+    'map': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc&usp=sharing",
+    'pdf': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE&usp=sharing"}
 
 # Expiration time for password protected project cookies
 PASSWD_COOKIE_TIMEOUT = 60 * 30
+
+# Expiration time for account confirmation / password recovery links
+ACCOUNT_LINK_EXPIRATION = 5 * 60 * 60
 
 ## Ratelimit configuration
 # LIMIT = 300
@@ -129,5 +140,16 @@ PASSWD_COOKIE_TIMEOUT = 60 * 30
 
 # Disable new account confirmation (via email)
 ACCOUNT_CONFIRMATION_DISABLED = True
+
+# Mailchimp API key
+# MAILCHIMP_API_KEY = "your-key"
+# MAILCHIMP_LIST_ID = "your-list-ID"
+
+# Flickr API key and secret
+# FLICKR_API_KEY = 'your-key'
+# FLICKR_SHARED_SECRET = 'your-secret'
+
+# DROPBOX APP KEY
+# DROPBOX_APP_KEY = 'your-key'
 WTF_CSRF_ENABLED = False
 CSRF_ENABLED = False

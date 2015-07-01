@@ -35,7 +35,7 @@ DESCRIPTION = 'Set the description in your config'
 TERMSOFUSE = 'http://okfn.org/terms-of-use/'
 DATAUSE = 'http://opendatacommons.org/licenses/by/'
 LOGO = ''
-LOCALES = ['en', 'es']
+LOCALES = ['en', 'es', 'it', 'fr']
 
 ## Default THEME
 THEME = 'contribua-theme'
@@ -44,7 +44,7 @@ THEME = 'contribua-theme'
 APPS_PER_PAGE = 20
 
 ## Default allowed extensions
-ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif']
+ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'zip']
 UPLOAD_METHOD = 'local'
 
 ## Default number of users shown in the leaderboard
@@ -57,11 +57,13 @@ ENABLE_DEBUG_TOOLBAR = False
 REDIS_CACHE_ENABLED = False
 REDIS_SENTINEL = [('localhost', 26379)]
 REDIS_MASTER = 'mymaster'
+REDIS_DB = 0
 
 REDIS_KEYPREFIX = 'pybossa_cache'
 
 ## Default cache timeouts
-# App cache
+# Project cache
+AVATAR_TIMEOUT = 30 * 24 * 60 * 60
 APP_TIMEOUT = 15 * 60
 REGISTERED_USERS_TIMEOUT = 15 * 60
 ANON_USERS_TIMEOUT = 5 * 60 * 60
@@ -76,14 +78,30 @@ CATEGORY_TIMEOUT = 24 * 60 * 60
 USER_TIMEOUT = 15 * 60
 USER_TOP_TIMEOUT = 24 * 60 * 60
 USER_TOTAL_TIMEOUT = 24 * 60 * 60
+
 # Project Presenters
 PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf"]
+# Default Google Docs spreadsheet template tasks URLs
+TEMPLATE_TASKS = {
+    'image': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE&usp=sharing",
+    'sound': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc&usp=sharing",
+    'video': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdGZ2UGhxSTJjQl9YNVhfUVhGRUdoRWc&usp=sharing",
+    'map': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc&usp=sharing",
+    'pdf': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE&usp=sharing"}
+
 # Rate limits default values
 LIMIT = 300
 PER = 15 * 60
 
 # Expiration time for password protected project cookies
 PASSWD_COOKIE_TIMEOUT = 60 * 30
+
+# Expiration time for account confirmation / password recovery links
+ACCOUNT_LINK_EXPIRATION = 5 * 60 * 60
+
+# Rate limits default values
+LIMIT = 300
+PER = 15 * 60
 
 # Disable new account confirmation (via email)
 ACCOUNT_CONFIRMATION_DISABLED = False

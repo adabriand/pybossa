@@ -25,10 +25,12 @@ This module exports:
 """
 import pyrax
 import traceback
+import time
 from flask import current_app, url_for
+from pybossa.core import timeouts
+from pybossa.cache import memoize
 from pybossa.uploader import Uploader
 from werkzeug import secure_filename
-
 
 class RackspaceUploader(Uploader):
 
@@ -63,14 +65,25 @@ class RackspaceUploader(Uploader):
             self.cf.make_container_public(name)
             return c
 
-    def _upload_file_to_rackspace(self, file, container):
+    def _upload_file_to_rackspace(self, file, container, attempt=0):
         """Upload file to rackspace."""
-        chksum = pyrax.utils.get_checksum(file)
-        self.cf.upload_file(container,
-                            file,
-                            obj_name=secure_filename(file.filename),
-                            etag=chksum)
-        return True
+        try:
+            chksum = pyrax.utils.get_checksum(file)
+            self.cf.upload_file(container,
+                                file,
+                                obj_name=secure_filename(file.filename),
+                                etag=chksum)
+            return True
+        except Exception as e:
+            print "Uploader exception"  # TODO: Log this!
+            traceback.print_exc()
+            attempt += 1
+            if (attempt < 3):
+                time.sleep(1)   # Wait one second and try again
+                return self._upload_file_to_rackspace(file, container, attempt)
+            else:
+                print "Tried to upload two times. Failed!"   # TODO: Log this!
+                raise
 
     def _upload_file(self, file, container):
         """Upload a file into a container."""
@@ -84,16 +97,17 @@ class RackspaceUploader(Uploader):
         except pyrax.exceptions.UploadFailed:
             return False
 
+    @memoize(timeout=timeouts.get('AVATAR_TIMEOUT'))
     def _lookup_url(self, endpoint, values):
         """Return Rackspace URL for object."""
         try:
             # Create failover urls for avatars
-            if 'app_' in values['filename']:
-                failover_url = url_for('static',
-                                       filename='img/placehodler.project.png')
-            else:
+            if '_avatar' in values['filename']:
                 failover_url = url_for('static',
                                        filename='img/placeholder.user.png')
+            else:
+                failover_url = url_for('static',
+                                       filename='img/placeholder.project.png')
             cont = self.get_container(values['container'])
             if cont.cdn_enabled:
                 return "%s/%s" % (cont.cdn_uri, values['filename'])
@@ -115,4 +129,13 @@ class RackspaceUploader(Uploader):
             obj.delete()
             return True
         except:
+            return False
+
+    def file_exists(self, name, container):
+        """Check if a file exists in a container"""
+        try:
+            cnt = self.get_container(container)
+            obj = cnt.get_object(name)
+            return obj is not None
+        except pyrax.exceptions.NoSuchObject:
             return False

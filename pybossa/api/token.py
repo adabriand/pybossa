@@ -23,15 +23,13 @@ This package adds GET method for:
 
 """
 import json
-from api_base import APIBase, error, require
-from pybossa.model.user import User
-import pybossa.cache.users as cached_users
 from werkzeug.exceptions import MethodNotAllowed, NotFound
-from flask import request, Response
+from flask import Response
 from flask.ext.login import current_user
 from pybossa.util import jsonpify
 from pybossa.ratelimit import ratelimit
-
+from api_base import APIBase, error
+from pybossa.auth import ensure_authorized_to
 
 class TokenAPI(APIBase):
 
@@ -47,7 +45,7 @@ class TokenAPI(APIBase):
     @ratelimit(limit=300, per=15 * 60)
     def get(self, token):
         try:
-            getattr(require, self._resource_name).read()
+            ensure_authorized_to('read', self._resource_name, token=token)
             user_tokens = self._get_all_tokens()
             if token:
                 response = self._get_token(token, user_tokens)
@@ -91,8 +89,8 @@ class TokenAPI(APIBase):
     def post(self):
         raise MethodNotAllowed(valid_methods=['GET'])
 
-    def delete(self):
+    def delete(self, oid=None):
         raise MethodNotAllowed(valid_methods=['GET'])
 
-    def put(self):
+    def put(self, oid=None):
         raise MethodNotAllowed(valid_methods=['GET'])

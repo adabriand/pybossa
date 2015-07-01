@@ -16,16 +16,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
-from pybossa.forms.forms import RegisterForm
-from default import Test, db, with_context
-from pybossa.model.user import User
-from pybossa.forms import validator
-from pybossa.view.account import LoginForm
-from factories import UserFactory
 from wtforms import ValidationError
 from nose.tools import raises
-from mock import patch
+from flask import current_app
 
+from default import Test, db, with_context
+from pybossa.forms.forms import (RegisterForm, LoginForm, EMAIL_MAX_LENGTH,
+    USER_NAME_MAX_LENGTH, USER_FULLNAME_MAX_LENGTH)
+from pybossa.forms import validator
+from pybossa.repositories import UserRepository
+from factories import UserFactory
+
+user_repo = UserRepository(db)
 
 class TestValidator(Test):
     def setUp(self):
@@ -39,8 +41,7 @@ class TestValidator(Test):
         with self.flask_app.test_request_context('/'):
             f = LoginForm()
             f.email.data = self.email_addr
-            u = validator.Unique(db.session, User,
-                                         User.email_addr)
+            u = validator.Unique(user_repo.get_by, 'email_addr')
             u.__call__(f, f.email)
 
     @raises(ValidationError)
@@ -60,6 +61,24 @@ class TestValidator(Test):
             f.email.data = '1 2 3'
             u = validator.CommaSeparatedIntegers()
             u.__call__(f, f.email)
+
+    @with_context
+    @raises(ValidationError)
+    def test_reserved_names_account_signin(self):
+        """Test VALIDATOR ReservedName for account URLs"""
+        form = RegisterForm()
+        form.name.data = 'signin'
+        val = validator.ReservedName('account', current_app)
+        val(form, form.name)
+
+    @with_context
+    @raises(ValidationError)
+    def test_reserved_names_project_published(self):
+        """Test VALIDATOR ReservedName for project URLs"""
+        form = RegisterForm()
+        form.name.data = 'category'
+        val = validator.ReservedName('project', current_app)
+        val(form, form.name)
 
 
 
@@ -98,9 +117,10 @@ class TestRegisterForm(Test):
     def test_register_name_length(self):
         self.fill_in_data['name'] = 'a'
         form = RegisterForm(**self.fill_in_data)
+        error_message = "User name must be between 3 and %s characters long" % USER_NAME_MAX_LENGTH
 
         assert not form.validate()
-        assert "User name must be between 3 and 35 characters long" in form.errors['name'], form.errors
+        assert error_message in form.errors['name'], form.errors
 
     @with_context
     def test_register_name_allowed_chars(self):
@@ -109,6 +129,15 @@ class TestRegisterForm(Test):
 
         assert not form.validate()
         assert "$#&\\/| and space symbols are forbidden" in form.errors['name'], form.errors
+
+    @with_context
+    def test_register_name_reserved_name(self):
+        self.fill_in_data['name'] = 'signin'
+
+        form = RegisterForm(**self.fill_in_data)
+
+        assert not form.validate()
+        assert u'This name is used by the system.' in form.errors['name'], form.errors
 
     @with_context
     def test_register_form_unique_email(self):
@@ -122,9 +151,10 @@ class TestRegisterForm(Test):
     def test_register_email_length(self):
         self.fill_in_data['email_addr'] = ''
         form = RegisterForm(**self.fill_in_data)
+        error_message = "Email must be between 3 and %s characters long" % EMAIL_MAX_LENGTH
 
         assert not form.validate()
-        assert "Email must be between 3 and 35 characters long" in form.errors['email_addr'], form.errors
+        assert error_message in form.errors['email_addr'], form.errors
 
     @with_context
     def test_register_email_valid_format(self):
@@ -138,9 +168,10 @@ class TestRegisterForm(Test):
     def test_register_fullname_length(self):
         self.fill_in_data['fullname'] = 'a'
         form = RegisterForm(**self.fill_in_data)
+        error_message = "Full name must be between 3 and %s characters long" % USER_FULLNAME_MAX_LENGTH
 
         assert not form.validate()
-        assert "Full name must be between 3 and 35 characters long" in form.errors['fullname'], form.errors
+        assert error_message in form.errors['fullname'], form.errors
 
     @with_context
     def test_register_password_required(self):

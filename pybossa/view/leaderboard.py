@@ -15,18 +15,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
-
-from flask import Blueprint, request, url_for, flash, redirect, abort, current_app
+"""Leaderboard view for PyBossa."""
+from flask import Blueprint, current_app
 from flask import render_template
-#from flaskext.wtf import Form, IntegerField, TextField, BooleanField, validators, HiddenInput
-from flask.ext.login import login_required, current_user
-from sqlalchemy.exc import UnboundExecutionError
-from sqlalchemy.sql import func, text
-from sqlalchemy import func
-
-import pybossa.model as model
-from pybossa.core import db
-from pybossa.auth import require
+from flask.ext.login import current_user
 from pybossa.cache import users as cached_users
 
 blueprint = Blueprint('leaderboard', __name__)
@@ -34,7 +26,7 @@ blueprint = Blueprint('leaderboard', __name__)
 
 @blueprint.route('/')
 def index():
-    """Get the last activity from users and apps"""
+    """Get the last activity from users and projects."""
     if current_user.is_authenticated():
         user_id = current_user.id
     else:

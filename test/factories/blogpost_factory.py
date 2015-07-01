@@ -17,18 +17,24 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 from pybossa.model.blogpost import Blogpost
-from . import BaseFactory, factory
+from . import BaseFactory, factory, blog_repo
 
 
 class BlogpostFactory(BaseFactory):
     class Meta:
         model = Blogpost
 
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        blogpost = model_class(*args, **kwargs)
+        blog_repo.save(blogpost)
+        return blogpost
+
     id = factory.Sequence(lambda n: n)
     title = u'Blogpost title'
     body = u'Blogpost body text'
-    app = factory.SubFactory('factories.AppFactory')
-    app_id = factory.LazyAttribute(lambda blogpost: blogpost.app.id)
-    owner = factory.SelfAttribute('app.owner')
+    project = factory.SubFactory('factories.ProjectFactory')
+    project_id = factory.LazyAttribute(lambda blogpost: blogpost.project.id)
+    owner = factory.SelfAttribute('project.owner')
     user_id = factory.LazyAttribute(
         lambda blogpost: blogpost.owner.id if blogpost.owner else None)

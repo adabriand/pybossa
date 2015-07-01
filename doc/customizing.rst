@@ -69,9 +69,9 @@ Database username and password
 PyBossa uses the SQLAlchemy_ SQL toolkit to access the DB. In the settings
 file, you only need to modify the name of the user, password and database name
 so it fits your needs in the field `SQLALCHEMY_DATABASE_URI`_::
-    
+
     'postgresql://username:userpassword@localhost/databasename'
-    
+
 .. _`SQLALCHEMY_DATABSE_URI`: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L28
 .. _SQLAlchemy: http://www.sqlalchemy.org/
 
@@ -96,7 +96,7 @@ It's dangerous, so better sign this
 
 PyBossa uses the `It's dangerous` Python library that allows you to send some
 data to untrusted environments, but signing it. Basically, it uses a key that
-the server only knows and uses it for signing the data. 
+the server only knows and uses it for signing the data.
 
 This library is used to send the recovery password e-mails to your PyBossa
 users, sending a link with a signed key that will be verified in the server.
@@ -156,9 +156,9 @@ As you can see, you will be able to give a full personality to your own PyBossa
 server without problems.
 
 .. note::
-    You can specify a different amount of apps per page if you want. Change the
-    default value in your settings_local.py file of APPS_PER_PAGE to the number
-    that you want. By default it gives you access to 20.
+    You can specify a different amount of projects per page if you want. Change
+    the default value in your settings_local.py file of APPS_PER_PAGE to the
+    number that you want. By default it gives you access to 20.
 
 .. _`repository pybossa-default-theme`: https://github.com/PyBossa/pybossa-default-theme
 
@@ -208,7 +208,7 @@ Facebook
 
 If you want to enable Facebook, you will need to create an application in
 Facebook_ and copy and paste the **app ID/API Key and secret** into the next
-variables: `FACEBOOK_APP_ID`_ and `FACEBOOK_APP_SECRET`_ and uncomment them.  
+variables: `FACEBOOK_APP_ID`_ and `FACEBOOK_APP_SECRET`_ and uncomment them.
 
 .. _Facebook: https://developers.facebook.com/apps
 .. _`FACEBOOK_APP_ID`: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L54
@@ -241,7 +241,7 @@ Enabling Logging
 
 PyBossa can log errors to a file_ or to a Sentry_ server. If none of the above
 configurations are used, you will get the errors in the log file of the web server that you
-are using (i.e. in Apache2 the errors will be in */var/log/apache2/err.log*).
+are using (i.e. in nginx the errors will be in /var/log/nginx/error.log*).
 
 .. _file: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L75
 .. _Sentry: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L73
@@ -250,7 +250,7 @@ Mail Setup
 ==========
 
 PyBossa needs a mail server in order to validate new accounts, send e-mails
-with for recovering passwords, so it is very important you configure a server.
+for recovering passwords, etc. , so it is very important you configure a server.
 Please, check the section `Mail setup`_ in the config file for configuring it.
 
 .. _`Mail setup`: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L80
@@ -263,7 +263,7 @@ browsing the server. For example, an scheduled shutdown for installing new
 hardware.
 
 PyBossa provides a general solution for these announcements via the
-`settings_local.py.tmpl <https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl>`_ 
+`settings_local.py.tmpl <https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl>`_
 configuration file. The announcement feature allows
 you to send messages to the following type of users:
 
@@ -278,12 +278,12 @@ is to modify the **ANNOUNCEMENT** variable to display the message for the given
 type of users:
 
 .. code-block:: python
-    
+
     ANNOUNCEMENT = {'root': 'Your secret message'}
-    
+
 
 There is an example of the **ANNOUNCEMENT** variable in the
-`settings_local.py.tmpl <https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl>`_ 
+`settings_local.py.tmpl <https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl>`_
 file, so you can easily adapt it for your own server. Basically, the
 announcement variable has a **key** and an associated **message**. The
 supported keys are:
@@ -293,7 +293,7 @@ supported keys are:
  * **owner**: for all registered users that have one or more projects
 
 .. note::
-    
+
     You can use a mix of messages at the same time without problems, so for
     example you can display a message for Admins and Owners at the same time.
 
@@ -305,7 +305,7 @@ fast as possible. PyBossa comes with a default set of timeouts for different
 views that you can change or modify to your own taste. All you have to do is
 modify the following variables in your settings file::
 
-    # App cache
+    # Project cache
     APP_TIMEOUT = 15 * 60
     REGISTERED_USERS_TIMEOUT = 15 * 60
     ANON_USERS_TIMEOUT = 5 * 60 * 60
@@ -354,7 +354,7 @@ settings_local.py file, you can adapt it to your own needs.
 Configuring upload method
 =========================
 
-PyBossa by default allows you to upload avatars for users, icons for apps, etc.
+PyBossa by default allows you to upload avatars for users, icons for projects, etc.
 using the local file system of your server. While this is nice for small
 setups, when you need to add more nodes to serve the same content, this feature
 could become a problem. For this reason, PyBossa also supports cloud solutions
@@ -405,7 +405,7 @@ Tracking the server with Google Analytics
 
 PyBossa provides an easy way to integrate Google Analytics with your PyBossa
 server. In order to enable it you only have to create a file with the name:
-**_ga.html** in the **pybossa/template** folder with the Google Tracking code. 
+**_ga.html** in the **pybossa/template** folder with the Google Tracking code.
 PyBossa will be including your Google Analytics tracking code in every page
 since that moment.
 
@@ -415,7 +415,7 @@ The file **_ga.html** should contain something like this::
       var _gaq = _gaq || [];
       _gaq.push(['_setAccount', 'UA-XXXXXXXX-X']);
       _gaq.push(['_trackPageview']);
-    
+
       (function() {
         var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
         ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
@@ -510,6 +510,13 @@ please, create a **_cookies_policy.html** file in the **custom** folder. You
 can re-use the template **help/_cookies_policy.html** and adapt it (it is
 located in the **template/help** folder.
 
+Using your own Privacy Policy
+=============================
+
+PyBossa has a blank privacy policy page. We recommend you to add one, so your
+users know how you are using their data. To add it, just create a file named
+**_privacy_policy.html** file in the **custom** folder.
+
 .. _config-ckan:
 
 Exporting data to a CKAN server
@@ -547,7 +554,7 @@ only administrators will be able to see the following pages:
  * http://server/stats
  * http://server/account/
  * http://server/account/user/
- * http://server/app/stats
+ * http://server/project/stats
 
 Anonymous and authenticated will see a warning message like this:
 
@@ -558,13 +565,13 @@ all these pages. If your project needs this type of protection you can enable
 it by changing the following config variable in your **settings_local.py** file from:
 
 .. code-block:: python
-    
+
     ENFORCE_PRIVACY = False
 
 To:
 
 .. code-block:: python
-    
+
     ENFORCE_PRIVACY = True
 
 
@@ -579,7 +586,7 @@ PyBossa supports different types of templates that you can offer for every
 project. By default, PyBossa comes with the following templates:
 
  * **Basic**: the most basic template. It only has the basic structure to
-   develop your project. 
+   develop your project.
  * **Image**: this template is for image pattern recognition.
  * **Sound**: similar to the image template, but for sound clips hosted in
    SoundCloud.
@@ -595,11 +602,25 @@ you want::
     PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf", "yourtemplate"]
 
 **Yourtemplate** should be a template that you have to save in the theme
-folder: **/templates/applications/snippets/** with the same name. Check the
+folder: **/templates/projects/snippets/** with the same name. Check the
 other templates to use them as a base layer for your template.
 
 After adding the template, the server will start offering this new template to
 your users.
+
+In addition to the project templates themselves, you can add some test tasks for
+those projects so that the users can import them to their projects and start
+"playing" with them, or taking their format as a starting point to create their
+own. These tasks can be imported from Google Docs spreadsheets, and you can add
+them, remove them, or modify the URLs of the spreadsheets changing the value of
+the variable **TEMPLATE_TASKS** in settings_local.py::
+
+TEMPLATE_TASKS = {
+    'image': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdHFEN29mZUF0czJWMUhIejF6dWZXdkE&usp=sharing",
+    'sound': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEczcWduOXRUb1JUc1VGMmJtc2xXaXc&usp=sharing",
+    'video': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdGZ2UGhxSTJjQl9YNVhfUVhGRUdoRWc&usp=sharing",
+    'map': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdGZnbjdwcnhKRVNlN1dGXy0tTnNWWXc&usp=sharing",
+    'pdf': "https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE&usp=sharing"}
 
 Setting an expiration time for project passwords
 ================================================
@@ -622,3 +643,51 @@ However, if you don't need this feature, it can be disabled (as it is by default
 with this configuration parameter::
 
     ACCOUNT_CONFIRMATION_DISABLED = True
+
+Newsletters with Mailchimp
+==========================
+
+PyBossa can show a subscription page to users when they create an account. By
+default is disabled, but if you want to enable it the system will show the page
+to registered users only once, to check if they want to be subscribed or not.
+
+In order to support newsletters, you'll have to create an account in Mailchimp
+and get an API_KEY as well as a LIST_ID to add the users. Once you've those two
+items you can enable the newsletter subscription as simple as this, add to your
+settings_local.py file the following values::
+
+    MAILCHIMP_API_KEY = "your-key"
+    MAILCHIMP_LIST_ID = "your-list-id"
+
+Restart the server, and you will be done. Now in your Mailchimp account you
+will be able to create campaigns, and communicate with your registered and
+interested users.
+
+Enabling the Flickr Task importer
+=================================
+
+PyBossa has five different types of built-in importers. Users can use them to
+import tasks for their projects directly from the Web interface. However, using
+the Flickr one requires an API key and shared secret from Flickr in order to
+communicate with the service.
+
+Once you have an API key, you'll have to add it to your settings_local.py file::
+
+    FLICKR_API_KEY = "your-key"
+    FLICKR_SHARED_SECRET = "your-secret"
+
+For more information on how to get a Flickr API key and shared secret, please
+refer to `here <https://www.flickr.com/services/api/>`_.
+
+Enabling the Dropbox Task importer
+==================================
+
+In addition to the Flickr importer, PyBossa also offers the Dropbox importer, which
+allows to import directly all kind of files from a Dropbox account. In order to
+use it, you'll need to register your PyBossa server as a Dropbox app, as explained
+`here <https://www.dropbox.com/developers/dropins/chooser/js#setup>`_.
+
+Don't worry about the Javascript snippet part, we've already handled that for you.
+Instead, get the App key you will be given and add it to your settings_local.py::
+
+    DROPBOX_APP_KEY = 'your-key'

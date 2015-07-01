@@ -30,15 +30,29 @@ import json
 from flask import request, abort, Response
 from flask.views import MethodView
 from werkzeug.exceptions import NotFound, Unauthorized, Forbidden
-from sqlalchemy.exc import IntegrityError
 from pybossa.util import jsonpify, crossdomain
-from pybossa.core import db, ratelimits
-from pybossa.auth import require
+from pybossa.core import ratelimits
+from pybossa.auth import ensure_authorized_to
 from pybossa.hateoas import Hateoas
 from pybossa.ratelimit import ratelimit
 from pybossa.error import ErrorStatus
 from facebook import UserFbAPI
+from pybossa.core import project_repo, user_repo, task_repo
 
+repos = {'Task'   : {'repo': task_repo, 'filter': 'filter_tasks_by',
+                     'get': 'get_task', 'save': 'save', 'update': 'update',
+                     'delete': 'delete'},
+        'TaskRun' : {'repo': task_repo, 'filter': 'filter_task_runs_by',
+                     'get': 'get_task_run',  'save': 'save', 'update': 'update',
+                     'delete': 'delete'},
+        'User'    : {'repo': user_repo, 'filter': 'filter_by', 'get': 'get',
+                     'save': 'save', 'update': 'update'},
+        'Project' : {'repo': project_repo, 'filter': 'filter_by', 'get': 'get',
+                     'save': 'save', 'update': 'update', 'delete': 'delete'},
+        'Category': {'repo': project_repo, 'filter': 'filter_categories_by',
+                     'get': 'get_category', 'save': 'save_category',
+                     'update': 'update_category', 'delete': 'delete_category'}
+        }
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -50,8 +64,6 @@ class APIBase(MethodView):
     """Class to create CRUD methods."""
 
     hateoas = Hateoas()
-
-    slave_session = db.slave_session
 
     def valid_args(self):
         """Check if the domain object args are valid."""
@@ -67,21 +79,21 @@ class APIBase(MethodView):
     @jsonpify
     @crossdomain(origin='*', headers=cors_headers)
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
-    def get(self, id):
+    def get(self, oid):
         """Get an object.
 
         Returns an item from the DB with the request.data JSON object or all
-        the items if id == None
+        the items if oid == None
 
         :arg self: The class of the object to be retrieved
-        :arg integer id: the ID of the object in the DB
+        :arg integer oid: the ID of the object in the DB
         :returns: The JSON item/s stored in the DB
 
         """
         try:
-            getattr(require, self.__class__.__name__.lower()).read()
-            query = self._db_query(id)
-            json_response = self._create_json_response(query, id)
+            ensure_authorized_to('read', self.__class__)
+            query = self._db_query(oid)
+            json_response = self._create_json_response(query, oid)
             return Response(json_response, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -89,21 +101,21 @@ class APIBase(MethodView):
                 target=self.__class__.__name__.lower(),
                 action='GET')
 
-    def _create_json_response(self, query_result, id):
+    def _create_json_response(self, query_result, oid):
         if len (query_result) == 1 and query_result[0] is None:
             raise abort(404)
         items = []
         for item in query_result:
             try:
                 items.append(self._create_dict_from_model(item))
-                getattr(require, self.__class__.__name__.lower()).read(item)
+                ensure_authorized_to('read', item)
             except (Forbidden, Unauthorized):
                 # Remove last added item, as it is 401 or 403
-                items.pop() 
-            except: # pragma: no cover
+                items.pop()
+            except Exception as ex: # pragma: no cover
                 raise
-        if id:
-            getattr(require, self.__class__.__name__.lower()).read(query_result[0])
+        if oid:
+            ensure_authorized_to('read', query_result[0])
             items = items[0]
         return json.dumps(items)
 
@@ -119,31 +131,30 @@ class APIBase(MethodView):
             obj['link'] = link
         return obj
 
-    def _db_query(self, id):
-        """ Returns a list with the results of the query"""
-        query = self.slave_session.query(self.__class__)
-        if id is None:
+    def _db_query(self, oid):
+        """Returns a list with the results of the query"""
+        repo_info = repos[self.__class__.__name__]
+        if oid is None:
             limit, offset = self._set_limit_and_offset()
-            query = self._filter_query(query, limit, offset)
+            results = self._filter_query(repo_info, limit, offset)
         else:
-            query = [query.get(id)]
-        return query
+            repo = repo_info['repo']
+            query_func = repo_info['get']
+            results = [getattr(repo, query_func)(oid)]
+        return results
 
-    def _filter_query(self, query, limit, offset):
+    def _filter_query(self, repo_info, limit, offset):
+        filters = {}
         for k in request.args.keys():
             if k not in ['limit', 'offset', 'api_key']:
                 # Raise an error if the k arg is not a column
                 getattr(self.__class__, k)
-                query = query.filter(
-                    getattr(self.__class__, k) == request.args[k])
-        query = self._custom_filter(query)
-        return self._format_query_result(query, limit, offset)
-
-    def _format_query_result(self, query, limit, offset):
-        query = query.order_by(self.__class__.id)
-        query = query.limit(limit)
-        query = query.offset(offset)
-        return query.all()
+                filters[k] = request.args[k]
+        repo = repo_info['repo']
+        query_func = repo_info['filter']
+        filters = self._custom_filter(filters)
+        results = getattr(repo, query_func)(limit=limit, offset=offset, **filters)
+        return results
 
     def _set_limit_and_offset(self):
         try:
@@ -169,16 +180,14 @@ class APIBase(MethodView):
         try:
             self.valid_args()
             data = json.loads(request.data)
-            # Clean HATEOAS args
+            self._forbidden_attributes(data)
             inst = self._create_instance_from_request(data)
-            db.session.add(inst)
-            db.session.commit()
+            repo = repos[self.__class__.__name__]['repo']
+            save_func = repos[self.__class__.__name__]['save']
+            getattr(repo, save_func)(inst)
+            self._log_changes(None, inst)
             return json.dumps(inst.dictize())
-        except IntegrityError:
-            db.session.rollback()
-            raise
         except Exception as e:
-            db.session.rollback()
             return error.format_exception(
                 e,
                 target=self.__class__.__name__.lower(),
@@ -202,16 +211,19 @@ class APIBase(MethodView):
             inst.user_id = fb_user.id
         
         getattr(require, self.__class__.__name__.lower()).create(inst)
+        self._update_object(inst)
+        ensure_authorized_to('create', inst)
+        self._validate_instance(inst)
         return inst
 
     @jsonpify
     @crossdomain(origin='*', headers=cors_headers)
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
-    def delete(self, id):
+    def delete(self, oid):
         """Delete a single item from the DB.
 
         :arg self: The class of the object to be deleted
-        :arg integer id: the ID of the object in the DB
+        :arg integer oid: the ID of the object in the DB
         :returns: An HTTP status code based on the output of the action.
 
         More info about HTTP status codes for this action `here
@@ -220,33 +232,34 @@ class APIBase(MethodView):
         """
         try:
             self.valid_args()
-            inst = self._delete_instance(id)
-            self._refresh_cache(inst)
+            self._delete_instance(oid)
             return '', 204
         except Exception as e:
-            db.session.rollback()
             return error.format_exception(
                 e,
                 target=self.__class__.__name__.lower(),
                 action='DELETE')
 
-    def _delete_instance(self, id):
-        inst = db.session.query(self.__class__).get(id)
+    def _delete_instance(self, oid):
+        repo = repos[self.__class__.__name__]['repo']
+        query_func = repos[self.__class__.__name__]['get']
+        inst = getattr(repo, query_func)(oid)
         if inst is None:
             raise NotFound
-        getattr(require, self.__class__.__name__.lower()).delete(inst)
-        db.session.delete(inst)
-        db.session.commit()
+        ensure_authorized_to('delete', inst)
+        self._log_changes(inst, None)
+        delete_func = repos[self.__class__.__name__]['delete']
+        getattr(repo, delete_func)(inst)
         return inst
 
     @jsonpify
     @crossdomain(origin='*', headers=cors_headers)
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
-    def put(self, id):
+    def put(self, oid):
         """Update a single item in the DB.
 
         :arg self: The class of the object to be updated
-        :arg integer id: the ID of the object in the DB
+        :arg integer oid: the ID of the object in the DB
         :returns: An HTTP status code based on the output of the action.
 
         More info about HTTP status codes for this action `here
@@ -255,34 +268,37 @@ class APIBase(MethodView):
         """
         try:
             self.valid_args()
-            inst = self._update_instance(id)
-            self._refresh_cache(inst)
+            inst = self._update_instance(oid)
             return Response(json.dumps(inst.dictize()), 200,
                             mimetype='application/json')
-        except IntegrityError:
-            db.session.rollback()
-            raise
         except Exception as e:
-            db.session.rollback()
             return error.format_exception(
                 e,
                 target=self.__class__.__name__.lower(),
                 action='PUT')
 
-    def _update_instance(self, id):
-        existing = db.session.query(self.__class__).get(id)
+    def _update_instance(self, oid):
+        repo = repos[self.__class__.__name__]['repo']
+        query_func = repos[self.__class__.__name__]['get']
+        existing = getattr(repo, query_func)(oid)
         if existing is None:
             raise NotFound
-        getattr(require, self.__class__.__name__.lower()).update(existing)
+        ensure_authorized_to('update', existing)
         data = json.loads(request.data)
-        # may be missing the id as we allow partial updates
-        data['id'] = id
-        # Clean HATEOAS args
+        self._forbidden_attributes(data)
+        # Remove hateoas links
         data = self.hateoas.remove_links(data)
-        inst = self.__class__(**data)
-        db.session.merge(inst)
-        db.session.commit()
-        return inst
+        # may be missing the id as we allow partial updates
+        data['id'] = oid
+        self.__class__(**data)
+        old = self.__class__(**existing.dictize())
+        for key in data:
+            setattr(existing, key, data[key])
+        update_func = repos[self.__class__.__name__]['update']
+        self._validate_instance(existing)
+        getattr(repo, update_func)(existing)
+        self._log_changes(old, existing)
+        return existing
 
 
     def _update_object(self, data_dict):
@@ -294,26 +310,31 @@ class APIBase(MethodView):
         """
         pass
 
-
-    def _refresh_cache(self, data_dict):
-        """Refresh cache.
-
-        Method to be overriden in inheriting classes which wish to refresh
-        cache for given object.
-
-        """
-        pass
-
-
     def _select_attributes(self, item_data):
         """Method to be overriden in inheriting classes in case it is not
-        desired that every object attribute is returned by the API
+        desired that every object attribute is returned by the API.
         """
         return item_data
 
-
     def _custom_filter(self, query):
         """Method to be overriden in inheriting classes which wish to consider
-        specific filtering criteria
+        specific filtering criteria.
         """
         return query
+
+    def _validate_instance(self, instance):
+        """Method to be overriden in inheriting classes which may need to
+        validate the creation (POST) or modification (PUT) of a domain object for
+        reasons other than business logic ones (e.g. overlapping of a project
+        name witht a URL).
+        """
+        pass
+
+    def _log_changes(self, old_obj, new_obj):
+        """Method to be overriden by inheriting classes for logging purposes"""
+        pass
+
+    def _forbidden_attributes(self, data):
+        """Method to be overriden by inheriting classes that will not allow for
+        certain fields to be used in PUT or POST requests"""
+        pass

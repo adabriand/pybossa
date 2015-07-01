@@ -17,79 +17,48 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 """
 PyBossa Account view for web projects.
-
 This module exports the following endpoints:
     * Accounts index: list of all registered users in PyBossa
     * Signin: method for signin into PyBossa
     * Signout: method for signout from PyBossa
     * Register: method for creating a new PyBossa account
     * Profile: method to manage user's profile (update data, reset password...)
-
 """
 from itsdangerous import BadData
 from markdown import markdown
-from flask_babel import get_locale
-import json
 import time
 
-from flask import Blueprint, request, url_for, flash, redirect, abort, jsonify
+from flask import Blueprint, request, url_for, flash, redirect, abort
 from flask import render_template, current_app
 from flask.ext.login import login_required, login_user, logout_user, \
     current_user
-from flask.ext.mail import Message
+from rq import Queue
 
 import pybossa.model as model
 from flask.ext.babel import gettext
-from sqlalchemy.sql import text
-from pybossa.model.user import User
-from pybossa.core import db, signer, mail, uploader, sentinel
-from pybossa.util import Pagination, get_user_id_or_ip, pretty_date
+from pybossa.core import signer, uploader, sentinel, newsletter
+from pybossa.util import Pagination
 from pybossa.util import get_user_signup_method
 from pybossa.cache import users as cached_users
-from pybossa.cache import apps as cached_apps
-from pybossa.auth import require
-
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
-from email import encoders
-from email.utils import formataddr
+from pybossa.auth import ensure_authorized_to
+from pybossa.jobs import send_mail
+from pybossa.core import user_repo
+from pybossa.feed import get_update_feed
 
 from pybossa.forms.account_view_forms import *
 
-try:
-    import cPickle as pickle
-except ImportError:  # pragma: no cover
-    import pickle
-
-import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 blueprint = Blueprint('account', __name__)
 
+mail_queue = Queue('super', connection=sentinel.master)
 
-def get_update_feed():
-    """Return update feed list."""
-    data = sentinel.slave.zrevrange('pybossa_feed', 0, 99, withscores=True)
-    update_feed = []
-    for u in data:
-        tmp = pickle.loads(u[0])
-        tmp['updated'] = u[1]
-        if tmp.get('info') and type(tmp.get('info')) == unicode:
-            tmp['info'] = json.loads(tmp['info'])
-        update_feed.append(tmp)
-    return update_feed
 
 @blueprint.route('/', defaults={'page': 1})
 @blueprint.route('/page/<int:page>')
 def index(page):
     """
     Index page for all PyBossa registered users.
-
     Returns a Jinja2 rendered template with the users.
-
     """
     update_feed = get_update_feed()
     per_page = 24
@@ -115,20 +84,17 @@ def index(page):
 def signin():
     """
     Signin method for PyBossa users.
-
     Returns a Jinja2 template with the result of signing process.
-
     """
     form = LoginForm(request.form)
     if request.method == 'POST' and form.validate():
         password = form.password.data
         email = form.email.data
-        user = model.user.User.query.filter_by(email_addr=email).first()
+        user = user_repo.get_by(email_addr=email)
         if user and user.check_password(password):
-            login_user(user, remember=True)
             msg_1 = gettext("Welcome back") + " " + user.fullname
             flash(msg_1, 'success')
-            return redirect(request.args.get("next") or url_for("home.home"))
+            return _sign_in_user(user)
         elif user:
             msg, method = get_user_signup_method(user)
             if method == 'local':
@@ -138,7 +104,7 @@ def signin():
                 flash(msg, 'info')
         else:
             msg = gettext("Ooops, we didn't find you in the system, \
-                          did you sign in?")
+                          did you sign up?")
             flash(msg, 'info')
 
     if request.method == 'POST' and not form.validate():
@@ -146,11 +112,11 @@ def signin():
     auth = {'twitter': False, 'facebook': False, 'google': False}
     if current_user.is_anonymous():
         # If Twitter is enabled in config, show the Twitter Sign in button
-        if ('twitter' in current_app.blueprints): # pragma: no cover
+        if ('twitter' in current_app.blueprints):  # pragma: no cover
             auth['twitter'] = True
-        if ('facebook' in current_app.blueprints): # pragma: no cover
+        if ('facebook' in current_app.blueprints):  # pragma: no cover
             auth['facebook'] = True
-        if ('google' in current_app.blueprints): # pragma: no cover
+        if ('google' in current_app.blueprints):  # pragma: no cover
             auth['google'] = True
         return render_template('account/signin.html',
                                title="Sign in",
@@ -161,62 +127,80 @@ def signin():
         return redirect(url_for("home.home"))
 
 
+def _sign_in_user(user):
+    login_user(user, remember=True)
+    if newsletter.ask_user_to_subscribe(user):
+        return redirect(url_for('account.newsletter_subscribe',
+                                 next=request.args.get('next')))
+    return redirect(request.args.get("next") or url_for("home.home"))
+
+
 @blueprint.route('/signout')
 def signout():
     """
     Signout PyBossa users.
-
     Returns a redirection to PyBossa home page.
-
     """
     logout_user()
     flash(gettext('You are now signed out'), 'success')
     return redirect(url_for('home.home'))
 
 
+def get_email_confirmation_url(account):
+    """Return confirmation url for a given user email."""
+    key = signer.dumps(account, salt='account-validation')
+    confirm_url = url_for('.confirm_account', key=key, _external=True)
+    return confirm_url
+
+
+@blueprint.route('/confirm-email')
+@login_required
+def confirm_email():
+    """Send email to confirm user email."""
+    acc_conf_dis = current_app.config.get('ACCOUNT_CONFIRMATION_DISABLED')
+    if acc_conf_dis:
+        return abort(404)
+    if current_user.valid_email is False:
+        user = user_repo.get(current_user.id)
+        account = dict(fullname=current_user.fullname, name=current_user.name,
+                       email_addr=current_user.email_addr)
+        confirm_url = get_email_confirmation_url(account)
+        subject = ('Verify your email in %s' % current_app.config.get('BRAND'))
+        msg = dict(subject=subject,
+                   recipients=[current_user.email_addr],
+                   body=render_template('/account/email/validate_email.md',
+                                        user=account, confirm_url=confirm_url))
+        msg['html'] = render_template('/account/email/validate_email.html',
+                                      user=account, confirm_url=confirm_url)
+        mail_queue.enqueue(send_mail, msg)
+        msg = gettext("An e-mail has been sent to \
+                       validate your e-mail address.")
+        flash(msg, 'info')
+        user.confirmation_email_sent = True
+        user_repo.update(user)
+    return redirect(url_for('.profile', name=current_user.name))
+
+
 @blueprint.route('/register', methods=['GET', 'POST'])
 def register():
     """
     Register method for creating a PyBossa account.
-
     Returns a Jinja2 template
-
     """
     form = RegisterForm(request.form)
     if request.method == 'POST' and form.validate():
         account = dict(fullname=form.fullname.data, name=form.name.data,
-                       email_addr=form.email_addr.data, password=form.password.data)
-        key = signer.dumps(account, salt='account-validation')
-        confirm_url = url_for('.confirm_account', key=key, _external=True)
+                       email_addr=form.email_addr.data,
+                       password=form.password.data)
+        confirm_url = get_email_confirmation_url(account)
         if current_app.config.get('ACCOUNT_CONFIRMATION_DISABLED'):
-            return redirect(confirm_url)
-        if str(get_locale()) == 'pt':
-            temp = '/account/email/validate_account_br.md'
-        else:
-            temp = '/account/email/validate_account.md'
-        html = render_template(temp, user=account, confirm_url=confirm_url)
-        
-        msg = MIMEMultipart('alternative')
-
-        sender_name = 'Contribua.org'
-        sender_addr = 'contribua@lsd.ufcg.edu.br'
-
-        subject = 'Bem vindo ao %s!' % current_app.config.get('BRAND')
-                        
-        receiver = account['email_addr']
-
-        sender_name = Header(sender_name, 'utf-8').encode()
-
-        msg['Subject'] = Header(subject, 'utf-8')
-        msg['From'] = formataddr((sender_name, sender_addr))
-        msg['To'] = receiver
-
-        part2 = MIMEText(html, 'html')
-        msg.attach(part2)
-        s = smtplib.SMTP('localhost')
-        s.sendmail(msg['From'], msg['To'], msg.as_string())
-        s.quit()
-        
+            return _create_account(account)
+        msg = dict(subject='Welcome to %s!' % current_app.config.get('BRAND'),
+                   recipients=[account['email_addr']],
+                   body=render_template('/account/email/validate_account.md',
+                                        user=account, confirm_url=confirm_url))
+        msg['html'] = markdown(msg['body'])
+        mail_queue.enqueue(send_mail, msg)
         return render_template('account/account_validation.html')
     if request.method == 'POST' and not form.validate():
         flash(gettext('Please correct the errors'), 'error')
@@ -224,29 +208,76 @@ def register():
                            title=gettext("Register"), form=form)
 
 
+@blueprint.route('/newsletter')
+@login_required
+def newsletter_subscribe():
+    """
+    Register method for subscribing user to PyBossa newsletter.
+    Returns a Jinja2 template
+    """
+    # Save that we've prompted the user to sign up in the newsletter
+    if newsletter.is_initialized() and current_user.is_authenticated():
+        next_url = request.args.get('next') or url_for('home.home')
+        user = user_repo.get(current_user.id)
+        if current_user.newsletter_prompted is False:
+            user.newsletter_prompted = True
+            user_repo.update(user)
+        if request.args.get('subscribe') == 'True':
+            newsletter.subscribe_user(user)
+            flash("You are subscribed to our newsletter!")
+            return redirect(next_url)
+        elif request.args.get('subscribe') == 'False':
+            return redirect(next_url)
+        else:
+            return render_template('account/newsletter.html',
+                                   title=gettext("Subscribe to our Newsletter"),
+                                   next=next_url)
+    else:
+        return abort(404)
+
+
 @blueprint.route('/register/confirmation', methods=['GET'])
 def confirm_account():
+    """Confir account endpoint."""
     key = request.args.get('key')
     if key is None:
         abort(403)
     try:
-        userdict = signer.loads(key, max_age=3600, salt='account-validation')
+        timeout = current_app.config.get('ACCOUNT_LINK_EXPIRATION', 3600)
+        userdict = signer.loads(key, max_age=timeout, salt='account-validation')
     except BadData:
         abort(403)
-    account = model.user.User(fullname=userdict['fullname'],
-                              name=userdict['name'],
-                              email_addr=userdict['email_addr'])
-    account.set_password(userdict['password'])
-    db.session.add(account)
-    db.session.commit()
-    login_user(account, remember=True)
+    # First check if the user exists
+    user = user_repo.get_by_name(userdict['name'])
+    if user is not None:
+        return _update_user_with_valid_email(user, userdict['email_addr'])
+    return _create_account(userdict)
+
+
+def _create_account(user_data):
+    new_user = model.user.User(fullname=user_data['fullname'],
+                               name=user_data['name'],
+                               email_addr=user_data['email_addr'],
+                               valid_email=True)
+    new_user.set_password(user_data['password'])
+    user_repo.save(new_user)
     flash(gettext('Thanks for signing-up'), 'success')
-    return redirect(url_for('home.home'))
+    return _sign_in_user(new_user)
+
+
+def _update_user_with_valid_email(user, email_addr):
+    user.valid_email = True
+    user.confirmation_email_sent = False
+    user.email_addr = email_addr
+    user_repo.update(user)
+    flash(gettext('Your email has been validated.'))
+    return _sign_in_user(user)
 
 
 @blueprint.route('/profile', methods=['GET'])
 def redirect_profile():
-    if current_user.is_anonymous(): # pragma: no cover
+    """Redirect method for profile."""
+    if current_user.is_anonymous():  # pragma: no cover
         return redirect(url_for('.signin'))
     return redirect(url_for('.profile', name=current_user.name), 302)
 
@@ -255,13 +286,11 @@ def redirect_profile():
 def profile(name):
     """
     Get user profile.
-
     Returns a Jinja2 template with the user information.
-
     """
-    user = db.slave_session.query(model.user.User).filter_by(name=name).first()
+    user = user_repo.get_by_name(name=name)
     if user is None:
-        return abort(404)
+        raise abort(404)
     if current_user.is_anonymous() or (user.id != current_user.id):
         return _show_public_profile(user)
     if current_user.is_authenticated() and user.id == current_user.id:
@@ -270,18 +299,17 @@ def profile(name):
 
 def _show_public_profile(user):
     user_dict = cached_users.get_user_summary(user.name)
-    apps_contributed = cached_users.apps_contributed_cached(user.id)
-    apps_created = cached_users.published_apps_cached(user.id)
+    projects_contributed = cached_users.projects_contributed_cached(user.id)
+    projects_created = cached_users.published_projects_cached(user.id)
     if current_user.is_authenticated() and current_user.admin:
-        apps_hidden = cached_users.hidden_apps(user.id)
-        apps_created.extend(apps_hidden)
-    if user_dict:
-        title = "%s &middot; User Profile" % user_dict['fullname']
-        return render_template('/account/public_profile.html',
-                               title=title,
-                               user=user_dict,
-                               apps=apps_contributed,
-                               apps_created=apps_created)
+        projects_hidden = cached_users.hidden_projects(user.id)
+        projects_created.extend(projects_hidden)
+    title = "%s &middot; User Profile" % user_dict['fullname']
+    return render_template('/account/public_profile.html',
+                           title=title,
+                           user=user_dict,
+                           projects=projects_contributed,
+                           projects_created=projects_created)
 
 
 def _show_own_profile(user):
@@ -289,242 +317,219 @@ def _show_own_profile(user):
     user.rank = rank_and_score['rank']
     user.score = rank_and_score['score']
     user.total = cached_users.get_total_users()
-    apps_contributed = cached_users.apps_contributed_cached(user.id)
-    apps_published, apps_draft = _get_user_apps(user.id)
-    apps_published.extend(cached_users.hidden_apps(user.id))
+    projects_contributed = cached_users.projects_contributed_cached(user.id)
+    projects_published, projects_draft = _get_user_projects(user.id)
+    projects_published.extend(cached_users.hidden_projects(user.id))
+    cached_users.get_user_summary(user.name)
 
     return render_template('account/profile.html', title=gettext("Profile"),
-                          apps_contrib=apps_contributed,
-                          apps_published=apps_published,
-                          apps_draft=apps_draft,
-                          user=cached_users.get_user_summary(user.name))
+                           projects_contrib=projects_contributed,
+                           projects_published=projects_published,
+                           projects_draft=projects_draft,
+                           user=user)
 
 
 @blueprint.route('/<name>/applications')
+@blueprint.route('/<name>/projects')
 @login_required
-def applications(name):
+def projects(name):
     """
     List user's project list.
-
     Returns a Jinja2 template with the list of projects of the user.
-
     """
-    user = db.slave_session.query(User).filter_by(name=name).first()
+    user = user_repo.get_by_name(name)
     if not user:
         return abort(404)
     if current_user.name != name:
         return abort(403)
 
-    user = db.slave_session.query(model.user.User).get(current_user.id)
-    apps_published, apps_draft = _get_user_apps(user.id)
-    apps_published.extend(cached_users.hidden_apps(user.id))
+    user = user_repo.get(current_user.id)
+    projects_published, projects_draft = _get_user_projects(user.id)
+    projects_published.extend(cached_users.hidden_projects(user.id))
 
-    return render_template('account/applications.html',
+    return render_template('account/projects.html',
                            title=gettext("Projects"),
-                           apps_published=apps_published,
-                           apps_draft=apps_draft)
+                           projects_published=projects_published,
+                           projects_draft=projects_draft)
 
 
-def _get_user_apps(user_id):
-    apps_published = cached_users.published_apps(user_id)
-    apps_draft = cached_users.draft_apps(user_id)
-    return apps_published, apps_draft
-
-
+def _get_user_projects(user_id):
+    projects_published = cached_users.published_projects(user_id)
+    projects_draft = cached_users.draft_projects(user_id)
+    return projects_published, projects_draft
 
 @blueprint.route('/<name>/update', methods=['GET', 'POST'])
 @login_required
 def update_profile(name):
     """
     Update user's profile.
-
     Returns Jinja2 template.
-
     """
-    user = User.query.filter_by(name=name).first()
+    user = user_repo.get_by_name(name)
     if not user:
         return abort(404)
-    require.user.update(user)
+    ensure_authorized_to('update', user)
     show_passwd_form = True
     if user.twitter_user_id or user.google_user_id or user.facebook_user_id:
         show_passwd_form = False
     usr = cached_users.get_user_summary(name)
     # Extend the values
-    current_user.rank = usr.get('rank')
-    current_user.score = usr.get('score')
-    # Title page
-    title_msg = "Update your profile: %s" % current_user.fullname
+    user.rank = usr.get('rank')
+    user.score = usr.get('score')
     # Creation of forms
     update_form = UpdateProfileForm(obj=user)
     update_form.set_locales(current_app.config['LOCALES'])
     avatar_form = AvatarUploadForm()
     password_form = ChangePasswordForm()
-    external_form = update_form
 
-
-    if request.method == 'GET':
-        return render_template('account/update.html',
-                               title=title_msg,
-                               user=usr,
-                               form=update_form,
-                               upload_form=avatar_form,
-                               password_form=password_form,
-                               external_form=external_form,
-                               show_passwd_form=show_passwd_form)
-    else:
+    if request.method == 'POST':
         # Update user avatar
         if request.form.get('btn') == 'Upload':
-            avatar_form = AvatarUploadForm()
-            if avatar_form.validate_on_submit():
-                file = request.files['avatar']
-                coordinates = (avatar_form.x1.data, avatar_form.y1.data,
-                               avatar_form.x2.data, avatar_form.y2.data)
-                prefix = time.time()
-                file.filename = "%s_avatar.png" % prefix
-                container = "user_%s" % current_user.id
-                uploader.upload_file(file,
-                                     container=container,
-                                     coordinates=coordinates)
-                # Delete previous avatar from storage
-                if current_user.info.get('avatar'):
-                    uploader.delete_file(current_user.info['avatar'], container)
-                current_user.info = {'avatar': file.filename,
-                                     'container': container}
-                db.session.commit()
-                cached_users.delete_user_summary(current_user.name)
-                flash(gettext('Your avatar has been updated! It may \
-                              take some minutes to refresh...'), 'success')
-                return redirect(url_for('.update_profile', name=current_user.name))
-            else:
-                flash("You have to provide an image file to update your avatar",
-                      "error")
-                return render_template('/account/update.html',
-                                       form=update_form,
-                                       upload_form=avatar_form,
-                                       password_form=password_form,
-                                       external_form=external_form,
-                                       title=title_msg,
-                                       show_passwd_form=show_passwd_form)
+            _handle_avatar_update(user, avatar_form)
         # Update user profile
         elif request.form.get('btn') == 'Profile':
-            update_form = UpdateProfileForm()
-            update_form.set_locales(current_app.config['LOCALES'])
-            if update_form.validate():
-                current_user.id = update_form.id.data
-                current_user.fullname = update_form.fullname.data
-                current_user.name = update_form.name.data
-                current_user.email_addr = update_form.email_addr.data
-                current_user.privacy_mode = update_form.privacy_mode.data
-                current_user.locale = update_form.locale.data
-                db.session.commit()
-                cached_users.delete_user_summary(current_user.name)
-                flash(gettext('Your profile has been updated!'), 'success')
-                return redirect(url_for('.update_profile', name=current_user.name))
-            else:
-                flash(gettext('Please correct the errors'), 'error')
-                title_msg = 'Update your profile: %s' % current_user.fullname
-                return render_template('/account/update.html',
-                                       form=update_form,
-                                       upload_form=avatar_form,
-                                       password_form=password_form,
-                                       external_form=external_form,
-                                       title=title_msg,
-                                       show_passwd_form=show_passwd_form)
-
+            _handle_profile_update(user, update_form)
         # Update user password
         elif request.form.get('btn') == 'Password':
-            # Update the data because passing it in the constructor does not work
-            update_form.name.data = user.name
-            update_form.fullname.data = user.fullname
-            update_form.email_addr.data = user.email_addr
-            update_form.ckan_api.data = user.ckan_api
-            external_form = update_form
-            if password_form.validate_on_submit():
-                user = db.session.query(model.user.User).get(current_user.id)
-                if user.check_password(password_form.current_password.data):
-                    user.set_password(password_form.new_password.data)
-                    db.session.add(user)
-                    db.session.commit()
-                    flash(gettext('Yay, you changed your password succesfully!'),
-                          'success')
-                    return redirect(url_for('.update_profile', name=name))
-                else:
-                    msg = gettext("Your current password doesn't match the "
-                                  "one in our records")
-                    flash(msg, 'error')
-                    return render_template('/account/update.html',
-                                           form=update_form,
-                                           upload_form=avatar_form,
-                                           password_form=password_form,
-                                           external_form=external_form,
-                                           title=title_msg,
-                                           show_passwd_form=show_passwd_form)
-            else:
-                flash(gettext('Please correct the errors'), 'error')
-                return render_template('/account/update.html',
-                                       form=update_form,
-                                       upload_form=avatar_form,
-                                       password_form=password_form,
-                                       external_form=external_form,
-                                       title=title_msg,
-                                       show_passwd_form=show_passwd_form)
+            _handle_password_update(user, password_form)
         # Update user external services
         elif request.form.get('btn') == 'External':
-            del external_form.locale
-            del external_form.email_addr
-            del external_form.fullname
-            del external_form.name
-            if external_form.validate():
-                current_user.ckan_api = external_form.ckan_api.data or None
-                db.session.commit()
-                cached_users.delete_user_summary(current_user.name)
-                flash(gettext('Your profile has been updated!'), 'success')
-                return redirect(url_for('.update_profile', name=current_user.name))
-            else:
-                flash(gettext('Please correct the errors'), 'error')
-                title_msg = 'Update your profile: %s' % current_user.fullname
-                return render_template('/account/update.html',
-                                       form=update_form,
-                                       upload_form=avatar_form,
-                                       password_form=password_form,
-                                       external_form=external_form,
-                                       title=title_msg,
-                                       show_passwd_form=show_passwd_form)
+            _handle_external_services_update(user, update_form)
         # Otherwise return 415
         else:
             return abort(415)
+        return redirect(url_for('.update_profile', name=user.name))
+
+    title_msg = "Update your profile: %s" % user.fullname
+    return render_template('/account/update.html',
+                           form=update_form,
+                           upload_form=avatar_form,
+                           password_form=password_form,
+                           title=title_msg,
+                           show_passwd_form=show_passwd_form)
+
+
+def _handle_avatar_update(user, avatar_form):
+    if avatar_form.validate_on_submit():
+        _file = request.files['avatar']
+        coordinates = (avatar_form.x1.data, avatar_form.y1.data,
+                       avatar_form.x2.data, avatar_form.y2.data)
+        prefix = time.time()
+        _file.filename = "%s_avatar.png" % prefix
+        container = "user_%s" % user.id
+        uploader.upload_file(_file,
+                             container=container,
+                             coordinates=coordinates)
+        # Delete previous avatar from storage
+        if user.info.get('avatar'):
+            uploader.delete_file(user.info['avatar'], container)
+        user.info = {'avatar': _file.filename,
+                             'container': container}
+        user_repo.update(user)
+        cached_users.delete_user_summary(user.name)
+        flash(gettext('Your avatar has been updated! It may \
+                      take some minutes to refresh...'), 'success')
+    else:
+        flash("You have to provide an image file to update your avatar", "error")
+
+
+def _handle_profile_update(user, update_form):
+    acc_conf_dis = current_app.config.get('ACCOUNT_CONFIRMATION_DISABLED')
+    if update_form.validate():
+        user.id = update_form.id.data
+        user.fullname = update_form.fullname.data
+        user.name = update_form.name.data
+        if (user.email_addr != update_form.email_addr.data and
+                acc_conf_dis is False):
+            user.valid_email = False
+            user.newsletter_prompted = False
+            account = dict(fullname=update_form.fullname.data,
+                           name=update_form.name.data,
+                           email_addr=update_form.email_addr.data)
+            confirm_url = get_email_confirmation_url(account)
+            subject = ('You have updated your email in %s! Verify it' \
+                       % current_app.config.get('BRAND'))
+            msg = dict(subject=subject,
+                       recipients=[update_form.email_addr.data],
+                       body=render_template(
+                           '/account/email/validate_email.md',
+                           user=account, confirm_url=confirm_url))
+            msg['html'] = markdown(msg['body'])
+            mail_queue.enqueue(send_mail, msg)
+            user.confirmation_email_sent = True
+            fls = gettext('An email has been sent to verify your \
+                          new email: %s. Once you verify it, it will \
+                          be updated.' % account['email_addr'])
+            flash(fls, 'info')
+        if acc_conf_dis:
+            user.email_addr = update_form.email_addr.data
+        user.privacy_mode = update_form.privacy_mode.data
+        user.locale = update_form.locale.data
+        user.subscribed = update_form.subscribed.data
+        user_repo.update(user)
+        cached_users.delete_user_summary(user.name)
+        flash(gettext('Your profile has been updated!'), 'success')
+    else:
+        flash(gettext('Please correct the errors'), 'error')
+
+
+def _handle_password_update(user, password_form):
+    if password_form.validate_on_submit():
+        user = user_repo.get(user.id)
+        if user.check_password(password_form.current_password.data):
+            user.set_password(password_form.new_password.data)
+            user_repo.update(user)
+            flash(gettext('Yay, you changed your password succesfully!'),
+                  'success')
+        else:
+            msg = gettext("Your current password doesn't match the "
+                          "one in our records")
+            flash(msg, 'error')
+    else:
+        flash(gettext('Please correct the errors'), 'error')
+
+
+def _handle_external_services_update(user, update_form):
+    del update_form.locale
+    del update_form.email_addr
+    del update_form.fullname
+    del update_form.name
+    if update_form.validate():
+        user.ckan_api = update_form.ckan_api.data or None
+        user_repo.update(user)
+        cached_users.delete_user_summary(user.name)
+        flash(gettext('Your profile has been updated!'), 'success')
+    else:
+        flash(gettext('Please correct the errors'), 'error')
 
 
 @blueprint.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
     """
     Reset password method.
-
     Returns a Jinja2 template.
-
     """
     key = request.args.get('key')
     if key is None:
         abort(403)
     userdict = {}
     try:
-        userdict = signer.loads(key, max_age=3600, salt='password-reset')
+        timeout = current_app.config.get('ACCOUNT_LINK_EXPIRATION', 3600)
+        userdict = signer.loads(key, max_age=timeout, salt='password-reset')
     except BadData:
         abort(403)
     username = userdict.get('user')
     if not username or not userdict.get('password'):
         abort(403)
-    user = model.user.User.query.filter_by(name=username).first_or_404()
+    user = user_repo.get_by_name(username)
     if user.passwd_hash != userdict.get('password'):
         abort(403)
     form = ChangePasswordForm(request.form)
     if form.validate_on_submit():
         user.set_password(form.new_password.data)
-        db.session.add(user)
-        db.session.commit()
-        login_user(user)
+        user_repo.update(user)
         flash(gettext('You reset your password successfully!'), 'success')
-        return redirect(url_for('.signin'))
+        return _sign_in_user(user)
     if request.method == 'POST' and not form.validate():
         flash(gettext('Please correct the errors'), 'error')
     return render_template('/account/password_reset.html', form=form)
@@ -534,65 +539,48 @@ def reset_password():
 def forgot_password():
     """
     Request a forgotten password for a user.
-
     Returns a Jinja2 template.
-
     """
     form = ForgotPasswordForm(request.form)
     if form.validate_on_submit():
-        user = model.user.User.query\
-                    .filter_by(email_addr=form.email_addr.data)\
-                    .first()
+        user = user_repo.get_by(email_addr=form.email_addr.data)
         if user and user.email_addr:
+            msg = dict(subject='Account Recovery',
+                       recipients=[user.email_addr])
             if user.twitter_user_id:
-                if str(get_locale()) == 'pt':
-                    temp = '/account/email/forgot_password_openid_br.md'
-                else:
-                    temp = '/account/email/forgot_password_openid.md'
-                html = render_template(temp, user=user, account_name='Twitter')
-            #elif user.facebook_user_id:
-            #    msg.body = render_template(
-            #        '/account/email/forgot_password_openid.md',
-            #        user=user, account_name='Facebook')
+                msg['body'] = render_template(
+                    '/account/email/forgot_password_openid.md',
+                    user=user, account_name='Twitter')
+                msg['html'] = render_template(
+                    '/account/email/forgot_password_openid.html',
+                    user=user, account_name='Twitter')
+            elif user.facebook_user_id:
+                msg['body'] = render_template(
+                    '/account/email/forgot_password_openid.md',
+                    user=user, account_name='Facebook')
+                msg['html'] = render_template(
+                    '/account/email/forgot_password_openid.html',
+                    user=user, account_name='Facebook')
             elif user.google_user_id:
-                if str(get_locale()) == 'pt':
-                    temp = '/account/email/forgot_password_openid_br.md'
-                else:
-                    temp = '/account/email/forgot_password_openid.md'
-                html = render_template(temp, user=user, account_name='Google')
+                msg['body'] = render_template(
+                    '/account/email/forgot_password_openid.md',
+                    user=user, account_name='Google')
+                msg['html'] = render_template(
+                    '/account/email/forgot_password_openid.html',
+                    user=user, account_name='Google')
             else:
                 userdict = {'user': user.name, 'password': user.passwd_hash}
                 key = signer.dumps(userdict, salt='password-reset')
                 recovery_url = url_for('.reset_password',
                                        key=key, _external=True)
-                if str(get_locale()) == 'pt':
-                    temp = '/account/email/forgot_password_br.md'
-                else:
-                    temp = '/account/email/forgot_password.md'
-                html = render_template(temp, user=user, recovery_url=recovery_url)
-	    msg = MIMEMultipart('alternative')
-
-            sender_name = 'Contribua.org'
-            sender_addr = 'contribua@lsd.ufcg.edu.br'
-
-            subject = 'Recuperação de Conta'
-                        
-            receiver = user.email_addr
-
-            sender_name = Header(sender_name, 'utf-8').encode()
-
-            msg['Subject'] = Header(subject, 'utf-8')
-            msg['From'] = formataddr((sender_name, sender_addr))
-            msg['To'] = receiver
-
-            part2 = MIMEText(html, 'html')
-            msg.attach(part2)
-
-            s = smtplib.SMTP('localhost')
-            s.sendmail(msg['From'], msg['To'], msg.as_string())
-            s.quit()
-	
-            flash(gettext("We've send you email with account "
+                msg['body'] = render_template(
+                    '/account/email/forgot_password.md',
+                    user=user, recovery_url=recovery_url)
+                msg['html'] = render_template(
+                    '/account/email/forgot_password.html',
+                    user=user, recovery_url=recovery_url)
+            mail_queue.enqueue(send_mail, msg)
+            flash(gettext("We've send you an email with account "
                           "recovery instructions!"),
                   'success')
         else:
@@ -611,26 +599,16 @@ def forgot_password():
 def reset_api_key(name):
     """
     Reset API-KEY for user.
-
     Returns a Jinja2 template.
-
     """
-    user = User.query.filter_by(name=name).first()
+    user = user_repo.get_by_name(name)
     if not user:
         return abort(404)
-    require.user.update(user)
-    title = ("User: %s &middot; Settings"
-             "- Reset API KEY") % current_user.fullname
+    ensure_authorized_to('update', user)
     user.api_key = model.make_uuid()
-    db.session.commit()
+    user_repo.update(user)
     cached_users.delete_user_summary(user.name)
     msg = gettext('New API-KEY generated')
     flash(msg, 'success')
     return redirect(url_for('account.profile', name=name))
 
-
-@blueprint.route('/currentUserInfo', methods=['GET', 'POST'])
-@login_required
-def currentUserInfo():
-    user = User.query.filter_by(name=current_user.name).first()
-    return jsonify(info=user.id)

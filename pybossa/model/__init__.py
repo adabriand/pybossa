@@ -21,33 +21,14 @@ import json
 import uuid
 
 from sqlalchemy import Text
-from sqlalchemy.orm import relationship, backref, class_mapper
+from sqlalchemy.orm import class_mapper
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator
-from sqlalchemy import event
-from sqlalchemy.engine import reflection
-from sqlalchemy.schema import (
-    MetaData,
-    Table,
-    DropTable,
-    ForeignKeyConstraint,
-    DropConstraint,
-    )
 
 import logging
-from time import time
 
-
-try:
-    import cPickle as pickle
-except ImportError:  # pragma: no cover
-    import pickle
-
-
-from pybossa.core import sentinel
 
 log = logging.getLogger(__name__)
-
 
 
 class DomainObject(object):
@@ -159,42 +140,8 @@ def make_uuid():
     return str(uuid.uuid4())
 
 
-def rebuild_db():
-    # See this SQLAlchemy recipe: http://www.sqlalchemy.org/trac/wiki/UsageRecipes/DropEverything
-    inspector = reflection.Inspector.from_engine(db.engine)
-    # gather all data first before dropping anything.
-    # some DBs lock after things have been dropped in
-    # a transaction.
-
-    metadata = MetaData()
-
-    tbs = []
-    all_fks = []
-
-    for table_name in inspector.get_table_names():
-        fks = []
-        for fk in inspector.get_foreign_keys(table_name):
-            if not fk['name']: # pragma: no cover
-                continue
-            fks.append(
-                ForeignKeyConstraint((),(),name=fk['name'])
-                )
-        t = Table(table_name,metadata,*fks)
-        tbs.append(t)
-        all_fks.extend(fks)
-
-    for fkc in all_fks:
-        db.engine.execute(DropConstraint(fkc))
-
-    for table in tbs:
-        db.engine.execute(DropTable(table))
-
-    db.session.commit()
-    db.create_all()
-
-def update_redis(obj):
-    """Add domain object to update feed in Redis."""
-    p = sentinel.master.pipeline()
-    tmp = pickle.dumps(obj)
-    p.zadd('pybossa_feed', time(), tmp)
-    p.execute()
+def update_project_timestamp(mapper, conn, target):
+    """Update method to be used by the relationship objects."""
+    sql_query = ("update project set updated='%s' where id=%s" %
+                 (make_timestamp(), target.project_id))
+    conn.execute(sql_query)

@@ -23,9 +23,10 @@ from mock import patch
 from collections import namedtuple
 from bs4 import BeautifulSoup
 from pybossa.model.user import User
-from pybossa.model.app import App
+from pybossa.model.project import Project
 from pybossa.model.task import Task
 from pybossa.model.category import Category
+from factories.taskrun_factory import TaskRunFactory
 
 
 FakeRequest = namedtuple('FakeRequest', ['text', 'status_code', 'headers'])
@@ -120,8 +121,8 @@ class TestAdmin(web.Helper):
     def test_06_admin_featured_apps_add_remove_app(self, mock):
         """Test ADMIN featured projects add-remove works as an admin user"""
         self.register()
-        self.new_application()
-        self.update_application()
+        self.new_project()
+        self.update_project()
         # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
         assert "Sample Project" not in res.data,\
@@ -129,9 +130,9 @@ class TestAdmin(web.Helper):
             " as it is not featured"
         # Only projects that have been published can be featured
         self.new_task(1)
-        app = db.session.query(App).get(1)
-        app.info = dict(task_presenter="something")
-        db.session.add(app)
+        project = db.session.query(Project).get(1)
+        project.info = dict(task_presenter="something")
+        db.session.add(project)
         db.session.commit()
         res = self.app.get('/admin/featured', follow_redirects=True)
         assert "Featured" in res.data, res.data
@@ -148,7 +149,7 @@ class TestAdmin(web.Helper):
         # A retry should fail
         res = self.app.post('/admin/featured/1')
         err = json.loads(res.data)
-        err_msg = "App.id 1 already featured"
+        err_msg = "Project.id 1 already featured"
         assert err['error'] == err_msg, err_msg
         assert err['status_code'] == 415, "Status code should be 415"
 
@@ -165,14 +166,14 @@ class TestAdmin(web.Helper):
         res = self.app.delete('/admin/featured/1')
         err = json.loads(res.data)
         assert err['status_code'] == 415, "Project should not be found"
-        err_msg = 'App.id 1 is not featured'
+        err_msg = 'Project.id 1 is not featured'
         assert err['error'] == err_msg, err_msg
 
         # Try with an id that does not exist
         res = self.app.delete('/admin/featured/999')
         err = json.loads(res.data)
         assert err['status_code'] == 404, "Project should not be found"
-        err_msg = 'App.id 999 not found'
+        err_msg = 'Project.id 999 not found'
         assert err['error'] == err_msg, err_msg
 
     @with_context
@@ -183,7 +184,7 @@ class TestAdmin(web.Helper):
         self.signout()
         self.register(name="John2", email="john2@john.com",
                       password="passwd")
-        self.new_application()
+        self.new_project()
         # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
         err_msg = ("The project should not be listed in the front page"
@@ -209,7 +210,7 @@ class TestAdmin(web.Helper):
     def test_08_admin_featured_apps_add_remove_app_anonymous(self, mock):
         """Test ADMIN featured projects add-remove works as an anonymous user"""
         self.register()
-        self.new_application()
+        self.new_project()
         self.signout()
         # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
@@ -447,42 +448,43 @@ class TestAdmin(web.Helper):
                             follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
-    @with_context
     @patch('pybossa.ckan.requests.get')
     @patch('pybossa.core.uploader.upload_file', return_value=True)
-    def test_19_admin_update_app(self, Mock, Mock2):
+    @patch('pybossa.forms.validator.requests.get')
+    def test_19_admin_update_app(self, Mock, Mock2, mock_webhook):
         """Test ADMIN can update a project that belongs to another user"""
         html_request = FakeRequest(json.dumps(self.pkg_json_not_found), 200,
                                    {'content-type': 'application/json'})
         Mock.return_value = html_request
+        mock_webhook.return_value = html_request
         self.register()
         self.signout()
         self.register(fullname="Juan Jose", name="juan",
                       email="juan@juan.com", password="juan")
-        self.new_application()
+        self.new_project()
         self.signout()
         # Sign in with the root user
         self.signin()
-        res = self.app.get('/app/sampleapp/settings')
+        res = self.app.get('/project/sampleapp/settings')
         err_msg = "Admin users should be able to get the settings page for any project"
         assert res.status == "200 OK", err_msg
-        res = self.update_application(method="GET")
+        res = self.update_project(method="GET")
         assert "Update the project" in res.data,\
             "The project should be updated by admin users"
-        res = self.update_application(new_name="Root",
+        res = self.update_project(new_name="Root",
                                       new_short_name="rootsampleapp")
-        res = self.app.get('/app/rootsampleapp', follow_redirects=True)
+        res = self.app.get('/project/rootsampleapp', follow_redirects=True)
         assert "Root" in res.data, "The app should be updated by admin users"
 
-        app = db.session.query(App)\
+        app = db.session.query(Project)\
                 .filter_by(short_name="rootsampleapp").first()
         juan = db.session.query(User).filter_by(name="juan").first()
         assert app.owner_id == juan.id, "Owner_id should be: %s" % juan.id
         assert app.owner_id != 1, "The owner should be not updated"
-        res = self.update_application(short_name="rootsampleapp",
+        res = self.update_project(short_name="rootsampleapp",
                                       new_short_name="sampleapp",
                                       new_long_description="New Long Desc")
-        res = self.app.get('/app/sampleapp', follow_redirects=True)
+        res = self.app.get('/project/sampleapp', follow_redirects=True)
         err_msg = "The long description should have been updated"
         assert "New Long Desc" in res.data, err_msg
 
@@ -494,14 +496,14 @@ class TestAdmin(web.Helper):
         self.signout()
         self.register(fullname="Juan Jose", name="juan",
                       email="juan@juan.com", password="juan")
-        self.new_application()
+        self.new_project()
         self.signout()
         # Sign in with the root user
         self.signin()
-        res = self.delete_application(method="GET")
+        res = self.delete_project(method="GET")
         assert "Yes, delete it" in res.data,\
             "The project should be deleted by admin users"
-        res = self.delete_application()
+        res = self.delete_project()
         err_msg = "The project should be deleted by admin users"
         assert "Project deleted!" in res.data, err_msg
 
@@ -510,16 +512,16 @@ class TestAdmin(web.Helper):
         """Test ADMIN can delete a project's tasks that belongs to another user"""
         # Admin
         self.create()
-        tasks = db.session.query(Task).filter_by(app_id=1).all()
+        tasks = db.session.query(Task).filter_by(project_id=1).all()
         assert len(tasks) > 0, "len(app.tasks) > 0"
         res = self.signin(email=u'root@root.com', password=u'tester' + 'root')
-        res = self.app.get('/app/test-app/tasks/delete', follow_redirects=True)
+        res = self.app.get('/project/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Admin user should get 200 in GET"
         assert res.status_code == 200, err_msg
-        res = self.app.post('/app/test-app/tasks/delete', follow_redirects=True)
+        res = self.app.post('/project/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Admin should get 200 in POST"
         assert res.status_code == 200, err_msg
-        tasks = db.session.query(Task).filter_by(app_id=1).all()
+        tasks = db.session.query(Task).filter_by(project_id=1).all()
         assert len(tasks) == 0, "len(app.tasks) != 0"
 
     @with_context
@@ -552,7 +554,7 @@ class TestAdmin(web.Helper):
         """Test ADMIN add category works"""
         self.create()
         category = {'name': 'cat', 'short_name': 'cat',
-                    'description': 'description'}
+                    'description': 'description', 'id': ""}
         # Anonymous user
         url = '/admin/categories'
         res = self.app.post(url, data=category, follow_redirects=True)
@@ -574,10 +576,7 @@ class TestAdmin(web.Helper):
         assert "Category added" in res.data, err_msg
         assert category['name'] in res.data, err_msg
 
-        category = {'name': 'cat', 'short_name': 'cat',
-                    'description': 'description'}
-
-        self.signin(email=self.root_addr, password=self.root_password)
+        # Create the same category again should fail
         res = self.app.post(url, data=category, follow_redirects=True)
         err_msg = "Category form validation should work"
         assert "Please correct the errors" in res.data, err_msg
@@ -694,3 +693,79 @@ class TestAdmin(web.Helper):
         assert category['name'] in res.data, err_msg
         output = db.session.query(Category).get(obj.id)
         assert output.id == category['id'], err_msg
+
+    @with_context
+    def test_admin_dashboard(self):
+        """Test ADMIN dashboard requires admin"""
+        url = '/admin/dashboard/'
+        res = self.app.get(url, follow_redirects=True)
+        err_msg = "It should require login"
+        assert "Sign in" in res.data, err_msg
+
+    @with_context
+    def test_admin_dashboard_auth_user(self):
+        """Test ADMIN dashboard requires admin"""
+        url = '/admin/dashboard/'
+        self.register()
+        self.signout()
+        self.register(fullname="juan", name="juan")
+        res = self.app.get(url, follow_redirects=True)
+        err_msg = "It should return 403"
+        assert res.status_code == 403, err_msg
+
+    @with_context
+    def test_admin_dashboard_admin_user(self):
+        """Test ADMIN dashboard admins can access it"""
+        url = '/admin/dashboard/'
+        self.register()
+        self.new_project()
+        res = self.app.get(url, follow_redirects=True)
+        err_msg = "It should return 200"
+        assert res.status_code == 200, err_msg
+        assert "No data" in res.data, res.data
+
+    @with_context
+    def test_admin_dashboard_admin_user_data(self):
+        """Test ADMIN dashboard admins can access it with data"""
+        url = '/admin/dashboard/'
+        self.register()
+        self.new_project()
+        self.new_task(1)
+        import pybossa.dashboard.jobs as dashboard
+        dashboard.active_anon_week()
+        dashboard.active_users_week()
+        dashboard.new_users_week()
+        dashboard.new_tasks_week()
+        dashboard.new_task_runs_week()
+        dashboard.new_projects_week()
+        dashboard.update_projects_week()
+        dashboard.returning_users_week()
+        res = self.app.get(url, follow_redirects=True)
+        err_msg = "It should return 200"
+        assert res.status_code == 200, err_msg
+        assert "No data" not in res.data, res.data
+        assert "New Users" in res.data, res.data
+
+    @with_context
+    @patch('pybossa.view.admin.DASHBOARD_QUEUE')
+    def test_admin_dashboard_admin_refresh_user_data(self, mock):
+        """Test ADMIN dashboard admins refresh can access it with data"""
+        url = '/admin/dashboard/?refresh=1'
+        self.register()
+        self.new_project()
+        self.new_task(1)
+        import pybossa.dashboard.jobs as dashboard
+        dashboard.active_anon_week()
+        dashboard.active_users_week()
+        dashboard.new_users_week()
+        dashboard.new_tasks_week()
+        dashboard.new_task_runs_week()
+        dashboard.new_projects_week()
+        dashboard.update_projects_week()
+        dashboard.returning_users_week()
+        res = self.app.get(url, follow_redirects=True)
+        err_msg = "It should return 200"
+        assert res.status_code == 200, err_msg
+        assert "No data" not in res.data, res.data
+        assert "New Users" in res.data, res.data
+        assert mock.enqueue.called

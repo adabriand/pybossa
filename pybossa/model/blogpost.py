@@ -18,15 +18,13 @@
 
 from sqlalchemy import Integer, Unicode, UnicodeText, Text
 from sqlalchemy.schema import Column, ForeignKey
-from sqlalchemy import event
 
 from pybossa.core import db
-from pybossa.model import DomainObject, make_timestamp, update_redis
-
+from pybossa.model import DomainObject, make_timestamp
 
 
 class Blogpost(db.Model, DomainObject):
-    """A blog post associated to a given app"""
+    """A blog post associated to a given project"""
 
     __tablename__ = 'blogpost'
 
@@ -35,28 +33,10 @@ class Blogpost(db.Model, DomainObject):
     #: UTC timestamp when the blogpost is created
     created = Column(Text, default=make_timestamp)
     #: Project.ID for the Blogpost
-    app_id = Column(Integer, ForeignKey('app.id', ondelete='CASCADE'), nullable=False)
+    project_id = Column(Integer, ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
     #: User.ID for the Blogpost
     user_id = Column(Integer, ForeignKey('user.id'))
     #: Title of the Blogpost
     title = Column(Unicode(length=255), nullable=False)
     #: Body of the Blogpost
     body = Column(UnicodeText, nullable=False)
-
-
-@event.listens_for(Blogpost, 'after_insert')
-def add_event(mapper, conn, target):
-    """Update PyBossa feed with new blog post."""
-    sql_query = ('select name, short_name, info from app \
-                 where id=%s') % target.app_id
-    results = conn.execute(sql_query)
-    obj = dict(id=target.app_id,
-               name=None,
-               short_name=None,
-               info=None,
-               action_updated='Blog')
-    for r in results:
-        obj['name'] = r.name
-        obj['short_name'] = r.short_name
-        obj['info'] = r.info
-    update_redis(obj)

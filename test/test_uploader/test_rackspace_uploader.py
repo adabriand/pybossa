@@ -67,7 +67,6 @@ class TestRackspaceUploader(Test):
             err_msg = "Init app should return the container."
             assert res is True, err_msg
 
-
     @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
            return_value=True)
     @patch('pybossa.uploader.rackspace.pyrax.utils.get_checksum',
@@ -105,7 +104,6 @@ class TestRackspaceUploader(Test):
                      call.get_container().get_object('test.jpg')]
             print mycf.mock_calls
             mycf.assert_has_calls(calls, any_order=True)
-
 
     @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
            return_value=True)
@@ -191,7 +189,6 @@ class TestRackspaceUploader(Test):
             u.init_app(self.flask_app)
             res = u._lookup_url('rackspace', {'filename': filename,
                                               'container': 'user_3'})
-            #failover_url = 'http://server/static/img/placeholder.user.png'
             url = 'http://rackspace.com/test.jpg'
             err_msg = "We should get the %s but we got %s " % (url, res)
             assert res == url, err_msg
@@ -201,10 +198,9 @@ class TestRackspaceUploader(Test):
     @with_context
     @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
            return_value=True)
-    @patch('pybossa.uploader.rackspace.url_for', return_value='/static/img/placeholder.user.png')
-    def test_rackspace_uploader_lookup_url_returns_failover_url(self, mock1, mock2):
+    def test_rackspace_uploader_lookup_url_returns_failover_url(self, mock):
         """Test RACKSPACE UPLOADER lookup returns failover_url for user avatar."""
-        filename = 'test.jpg'
+        filename = 'test_avatar.jpg'
         with patch('pybossa.uploader.rackspace.pyrax.cloudfiles') as mycf:
             cdn_enabled_mock = PropertyMock(return_value=False)
             type(fake_container).cdn_enabled = cdn_enabled_mock
@@ -214,16 +210,35 @@ class TestRackspaceUploader(Test):
             u.init_app(self.flask_app)
             res = u._lookup_url('rackspace', {'filename': filename,
                                               'container': 'user_3'})
-            failover_url = '/static/img/placeholder.user.png'
+            failover_url = 'http://localhost/static/img/placeholder.user.png'
             err_msg = "We should get the %s but we got %s " % (failover_url, res)
             assert res == failover_url, err_msg
 
     @with_context
     @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
            return_value=True)
-    @patch('pybossa.uploader.rackspace.url_for', return_value='/static/img/placeholder.project.png')
-    def test_rackspace_uploader_lookup_url_returns_failover_url_project(self, mock1, mock2):
+    def test_rackspace_uploader_lookup_url_returns_failover_url_project(self, mock):
         """Test RACKSPACE UPLOADER lookup returns failover_url for project avatar."""
+        filename = 'project_32.jpg'
+        with patch('pybossa.uploader.rackspace.pyrax.cloudfiles') as mycf:
+            cdn_enabled_mock = PropertyMock(return_value=False)
+            type(fake_container).cdn_enabled = cdn_enabled_mock
+            mycf.get_container.return_value = fake_container
+            fake_container.make_public.side_effect = NoSuchObject
+            u = RackspaceUploader()
+            u.init_app(self.flask_app)
+            res = u._lookup_url('rackspace', {'filename': filename,
+                                              'container': 'user_3'})
+            failover_url = 'http://localhost/static/img/placeholder.project.png'
+            err_msg = "We should get the %s but we got %s " % (failover_url, res)
+            assert res == failover_url, err_msg
+
+    @with_context
+    @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
+           return_value=True)
+    def test_rackspace_uploader_lookup_url_returns_failover_url_project_backwards_compat(self, mock):
+        """Test RACKSPACE UPLOADER lookup returns failover_url for project
+        avatar for old project avatars named with 'app'."""
         filename = 'app_32.jpg'
         with patch('pybossa.uploader.rackspace.pyrax.cloudfiles') as mycf:
             cdn_enabled_mock = PropertyMock(return_value=False)
@@ -234,11 +249,9 @@ class TestRackspaceUploader(Test):
             u.init_app(self.flask_app)
             res = u._lookup_url('rackspace', {'filename': filename,
                                               'container': 'user_3'})
-            failover_url = '/static/img/placeholder.project.png'
+            failover_url = 'http://localhost/static/img/placeholder.project.png'
             err_msg = "We should get the %s but we got %s " % (failover_url, res)
             assert res == failover_url, err_msg
-
-
 
     @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
            return_value=True)
@@ -282,10 +295,41 @@ class TestRackspaceUploader(Test):
             container.get_object.side_effect = NoSuchObject
             mycf.get_container.return_value = container
 
-            calls = [call.get_container('container'),
-                     ]
+            calls = [call.get_container('container')]
             u = RackspaceUploader()
             u.init_app(self.flask_app)
             err_msg = "It should return False"
             assert u.delete_file('file', 'container') is False, err_msg
             mycf.assert_has_calls(calls, any_order=True)
+
+    @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
+           return_value=True)
+    def test_file_exists_for_missing_file(self, credentials):
+        """Test RACKSPACE UPLOADER file_exists returns False if the file does not exist"""
+        with patch('pybossa.uploader.rackspace.pyrax.cloudfiles') as mycf:
+            u = RackspaceUploader()
+            u.init_app(self.flask_app)
+            container = MagicMock()
+            container.get_object.side_effect = NoSuchObject
+            mycf.get_container.return_value = container
+            file_exists = u.file_exists('noexist.txt', 'mycontainer')
+
+            mycf.get_container.assert_called_with('mycontainer')
+            assert file_exists is False
+
+    @patch('pybossa.uploader.rackspace.pyrax.set_credentials',
+           return_value=True)
+    def test_file_exists_for_real_file(self, credentials):
+        """Test RACKSPACE UPLOADER file_exists returns True if the file exists"""
+        with patch('pybossa.uploader.rackspace.pyrax.cloudfiles') as mycf:
+            u = RackspaceUploader()
+            u.init_app(self.flask_app)
+            filename='test.jpg'
+            container = MagicMock()
+            container.get_object.return_value = "Real File"
+            mycf.get_container.return_value = container
+            file_exists = u.file_exists(filename, 'mycontainer')
+
+            mycf.get_container.assert_called_with('mycontainer')
+            container.get_object.assert_called_with(filename)
+            assert file_exists is True

@@ -2,6 +2,11 @@
 # Installation steps for every Ubuntu 14.04
 - hosts: all
   sudo: yes
+  vars:
+    pybossa_user: "vagrant"
+    pybossa_path: "/vagrant"
+    vagrant_home: "/home/vagrant"
+    virtualenv_path: "/home/vagrant/pybossa-env"
   tasks:
     - name: Check Ubuntu 14.04 running
       assert:
@@ -31,6 +36,7 @@
         - libjpeg-dev
         - libssl-dev
         - swig
+        - libffi-dev
 
     - name: install PostgreSQL
       apt: name={{item}} state=latest
@@ -49,10 +55,6 @@
     - name: start Redis service
       service: name=redis-server state=started
 
-# Do this installation steps only in Vagrant. TODO: Production steps
-- hosts: vagrant
-  sudo: yes
-  tasks:
     - name: install Redis Sentinel
       copy: src={{pybossa_path}}/contrib/redis/redis-sentinel dest=/etc/init.d/redis-sentinel owner=root group=root mode=755
 
@@ -61,6 +63,10 @@
 
     - name: start Sentinel and enable it at boot
       service: name=redis-sentinel state=started enabled=yes
+
+    - name: "upgrade pip itself"
+      sudo_user: "{{pybossa_user}}"
+      pip: name=pip state=latest chdir={{pybossa_path}} virtualenv={{virtualenv_path}} virtualenv_site_packages=yes
 
     - name: "install PyBossa virtualenv packages, can take some time..."
       sudo_user: "{{pybossa_user}}"
@@ -124,10 +130,18 @@
                      lc_ctype='en_US.UTF-8'
                      template='template0'
 
-# change .bashrc only in Vagrant development version
-- hosts: vagrant_dev
-  sudo: yes
-  tasks:
+    - name: install Supervisor
+      apt: name=supervisor
+
+    - name: start Supervisor service
+      service: name=supervisor state=started
+
+    - name: copy Supervisor config
+      template: src=templates/rq-worker.conf.j2 dest=/etc/supervisor/conf.d/rq-worker.conf owner=root group=root
+      notify:
+       - restart supervisor
+
+    # activate virtualenv always in .bashrc
     - name: virtualenv usage by default on bash login
       sudo_user: "{{pybossa_user}}"
       lineinfile:
@@ -146,3 +160,6 @@
         state=present
         insertafter=EOF
 
+  handlers:
+    - name: restart supervisor
+      service: name=supervisor state=restarted

@@ -22,33 +22,41 @@ This package adds GET, POST, PUT and DELETE methods for:
     * projects,
 
 """
+from flask import redirect, url_for, request
 from flask.ext.login import current_user
 from api_base import APIBase
-from pybossa.model.app import App
-import pybossa.cache.apps as cached_apps
+from pybossa.model.project import Project
+import pybossa.cache.projects as cached_projects
 from pybossa.cache.categories import get_all as get_categories
+from pybossa.util import is_reserved_name
+from pybossa.core import auditlog_repo
+from pybossa.auditlogger import AuditLogger
+
+auditlogger = AuditLogger(auditlog_repo, caller='api')
 
 
 class AppAPI(APIBase):
 
     """
-    Class for the domain object App.
+    Class for the domain object Project.
 
     It refreshes automatically the cache, and updates the project properly.
 
     """
 
-    __class__ = App
+    __class__ = Project
 
-    def _create_instance_from_request(self, data):
-        inst = super(AppAPI, self)._create_instance_from_request(data)
-        default_category = get_categories()[0]
-        inst.category_id = default_category.id
-        return inst
+    def get(self, oid):
+        return redirect(url_for('api.api_project', oid=oid))
 
-    def _refresh_cache(self, obj):
-        cached_apps.delete_app(obj.short_name)
+    def post(self):
+        return redirect(url_for('api.api_project'), code=307)
 
-    def _update_object(self, obj):
-        if not current_user.is_anonymous():
-            obj.owner_id = current_user.id
+    def delete(self, oid):
+        return redirect(url_for('api.api_project', oid=oid), code=307)
+
+    def put(self, oid):
+        api_key = request.args.get('api_key')
+        return redirect(url_for('api.api_project',
+                                oid=oid,
+                                api_key=api_key), code=307)

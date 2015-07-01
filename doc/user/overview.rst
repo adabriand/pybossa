@@ -17,7 +17,7 @@ will have the following items:
 #. **Description**
 
 The **slug** or **short name** is a shortcut for accessing the project via
-the web (short urls like this http://domain.com/app/slug).
+the web (short urls like this http://domain.com/project/slug).
 
 The **description** is a short sentence that will be used to describe your
 project.
@@ -123,7 +123,7 @@ Tasks can be imported from a CSV file or a Google Spreadsheet via the simple
 built-in :ref:`task-creator`. You have to do the following:
 
 1. Navigate to your project's page (you can directly access it using 
-   the *slug* project name: http://server/app/slug).
+   the *slug* project name: http://server/project/slug).
 
 .. image:: http://i.imgur.com/98o4ixD.png
 
@@ -132,19 +132,25 @@ built-in :ref:`task-creator`. You have to do the following:
 .. image:: http://i.imgur.com/u5vusQR.png
    :width: 100%
 
-3. And click again on the **Import Tasks** 
-   button. After clicking on it you will see 7 different options:
+3. And click again on the **Import Tasks** button. After clicking on it you will
+   see several options. The first five are for using the different kinds of
+   importers supported by PyBossa.
 
-.. image:: http://i.imgur.com/Qf2sMGV.png
+.. image:: http://i.imgur.com/e9GhNlE.png
 
-The **CSV** template, allows you to upload your own CSV file:
+The **CSV** importer, allows you to upload your own CSV file:
 
 .. image:: http://i.imgur.com/qoqIztQ.png
 
-4. Where you will have to provide a URL to a CSV file that you can have hosted
-   in DropBox or any similar web service. PyBossa also supports Google Drive
-   Spreadsheets, so use this option if you have your data in Google Drive. 
-   
+Where you will have to provide a URL to a CSV file that you can have hosted in
+any free web hosting services like DropBox_. You will only need to copy the file
+to the **public** folder of the chosen service in your own computer
+(i.e. DropbBox Public folder) and then copy the public link created by the
+service. Put that link into the text box in the above picture and click on "import".
+
+Similarly, PyBossa also supports **Google Drive Spreadsheets**, so use this
+option if you have your data in Google Drive spreadsheet.
+
 .. note::
 
    If you're trying to import from a Google Spreadsheet, ensure the file is
@@ -159,12 +165,15 @@ The **CSV** template, allows you to upload your own CSV file:
    **priority_0**, or **n_answers**, it will be saved in the respective
    columns. Your spreadsheet must be visible to public or everyone with URL.
 
-The other options pre-load a Google Docs URL to a public spreadsheet, 
-that you can automatically import for your project (the URL will
-automatically copy and pasted into the input field for importing the tasks).
+Finally, you will see that there are options for importing tasks from both an
+EpiCollect project or a Flickr photo set, which are fully described in the next
+two sections.
 
-Finally, you will see that there is an option for importing tasks from an
-EpiCollect project, which is fully described in the next section. 
+The other four options pre-load a Google Docs URL of a public spreadsheet,
+that you can automatically import for your project (the URL will automatically
+copy and pasted into the input field for importing the tasks).
+
+.. image::http://i.imgur.com/5VrNFqs.png
 
 By using these templates, you'll be able to learn the structure of the tasks,
 and directly re-use the :ref:`task-presenter` templates that know the structure
@@ -182,15 +191,6 @@ available templates are the following:
 * `PDF transcription`_. 
 
 .. note::
-
-    You can also upload your own CSV files to free web hosting services like
-    DropBox_. You will only need to copy the file to the
-    **public** folder of the chosen service in your own computer
-    (i.e. DropbBox Public folder) and then copy the public link created by the 
-    service. Once you have the public link, all you need in order to import the 
-    tasks is to paste it in the input box of the section **From a CSV file**.
-
-.. note::
     If you import again the same URL, only new records will be added to the
     project.
 
@@ -202,6 +202,7 @@ available templates are the following:
 .. _`PDF transcription`: https://docs.google.com/spreadsheet/ccc?key=0AsNlt0WgPAHwdEVVamc0R0hrcjlGdXRaUXlqRXlJMEE&usp=sharing
 .. _`DropBox`: http://www.dropbox.com
 
+.. _epicollect-import:
 
 Importing the tasks from an EpiCollect Plus Public Project
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -235,7 +236,7 @@ If you want to import the data points submitted to a **public** EpiCollect_
 project, you will have to follow the next steps:
 
 1. Navigate to your project's page (you can directly access it using 
-   the *slug* project name: http://server/app/slug).
+   the *slug* project name: http://server/project/slug).
 
 .. image:: http://i.imgur.com/98o4ixD.png
 
@@ -246,11 +247,12 @@ project, you will have to follow the next steps:
 
     
 3. And  click on the **Import Tasks** 
-   button. After clicking on it you will see 7 different options:
+   button. After clicking on it you will see several different options. The first
+   five correspond to the different importers PyBossa supports:
 
-.. image:: http://i.imgur.com/Qf2sMGV.png
+.. image:: http://i.imgur.com/e9GhNlE.png
 
-4. Click in the first one: **Use an EpiCollect Project**
+4. Click in the **Use an EpiCollect Project** one.
 
 5. Then, type the **name of the EpiCollect project** and the name of the
    **form** that you want to import, and click in the import button
@@ -267,6 +269,154 @@ All the data points should be imported now in your project.
     points** will be imported. This feature will allow you to easily add new data
     points to the PyBossa project without having to do anything special.
 
+.. _flickr-import:
+
+Importing the tasks from a Flickr photo set
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+PyBossa also allows to import tasks for projects based on images (like image
+pattern recognition ones) directly from a Flickr_ `set <https://www.flickr.com/help/photos/#150321191>`_
+(also called album).
+
+When importing tasks from a Flickr set, a new task will be created for each of
+the photos in the specified set. The tasks will include the following data about
+each picture (which will be later available to be used in the task presenter):
+
+* title: the title of the photograph, as it appears on Flickr.
+* url: the url to the raw .jpg image, in its original size.
+* url_b: the url to the image, 'big sized.
+* url_m: the url to the image, 'medium' sized.
+* link: a link to the photo page in flickr (not to the raw image).
+
+You can import tasks from a Flickr photo set (a.k.a. album) in either of the
+following ways:
+
+The easiest one is to give the PyBossa server permission to access your Flickr
+list of albums. To do so, you'll have to log in to your Flickr account by clicking
+the "Log in Flickr" button. Then you'll be redirected to Flickr, where you will
+be asked if you want to allow PyBossa to access your Flickr information. If you
+say yes, then you'll be again redirected to PyBossa and you'll see all of your
+albums. Choose one of them and then click the "Import" button to get all the
+photos created as tasks for your project.
+
+.. note::
+    Next time you try to import photos using the Flickr importer, you'll see
+    the albums for your account again. If you don't want PyBossa to access them
+    anymore, or just want to use another Flickr account, then click "Revoke access".
+
+Another option to import from a Flickr album is by specifying the ID of the set
+(album) directly. This option is a bit more advanced (don't be afraid, it is still
+very easy if you follow the next steps) and it allows you to import from a photo
+set that you don't own (although, it will have to be public. Also check the rights
+of the photos on it!). Another advantage is that you don't need to log in to
+Flickr, sou you don't even need to have a Flickr account.
+
+These are the steps:
+
+1. Navigate to your project's page and click in the **Tasks** section:
+
+.. image:: http://i.imgur.com/u5vusQR.png
+   :width: 100%
+
+2. Then click on the **Import Tasks** button, and select the **Flickr importer**:
+
+.. image:: http://i.imgur.com/e9GhNlE.png
+
+3. Type the ID of the Flickr set you want to import the photos from, then click
+on the import button:
+
+.. image:: http://i.imgur.com/P2yU8qd.png
+   :width: 100%
+
+If you cannot find the ID or don't know what it is, just browse to your Flickr
+photo set and check the URL. Can you see that last long number rigth at the end
+of it? That's what you're looking for!
+
+.. image:: http://i.imgur.com/h6qNDX2.png
+   :width: 100%
+
+And all the photos will be imported to your project. Just like with the other
+importers, each task will be created only once, even if you import twice from the
+same Flickr set (unless you add new photos to it, of course!).
+
+.. note::
+    You will need to make sure that every photo belonging to the set has the
+    visibility set to public, so the PyBossa server can then access and present
+    them to the volunteers of your project.
+
+.. _`Flickr`: https://www.flickr.com/
+
+Importing the tasks from a Dropbox account
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can import tasks from arbitrary data hosted on a Dropbox account with the
+Dropbox importer. When importer tasks like this, the following information will
+be added to the info field of each tasks, available later to be used in the task
+presenter of the project:
+
+* filename: just it, the name of the file you're importing as a task.
+* link: the link to the Dropbox page showing the file.
+* link_raw: the link to the raw file served by Dropbox. This is the one you'll
+have to use if you want to direct link to the file from the presenter (e.g. for
+using an image in a <img> tag, you'd do: <img src=task.info.link_raw>).
+
+In addition to these generic information, the Dropbox importer also will recognize
+some kind of files by their extension and will attach some extra information to
+them.
+
+For pdf files (.pdf extension), the following field will be obtained too:
+
+* pdf_url: direct linkt to the raw pdf file, with CORS support.
+
+For image files (.png, jpg, .jpeg and .gif extensions) the following data will be
+available:
+
+* url_m: the same as link_raw
+* url_b: the same as link_raw
+* title: the same as filename
+
+For audio files (.mp4, .m4a, .mp3, .ogg, .oga, .webm and .wav extensions):
+
+* audio_url: raw link to the audio file, which can be used inside an HTML 5 <audio>
+tag and supports CORS.
+
+For video files (.mp4, .m4v, .ogg, .ogv, .webm and .avi extensions):
+
+* audio_url: raw link to the video file, which can be used inside an HTML 5 <video>
+tag and supports CORS.
+
+The tasks created with the Dropbox importer are ready to be used with the template
+project presenters available in PyBossa, as they include the described fields.
+
+Thus, importing your images from Dropbox will allow you to immediately use the
+image pattern recognition template with them; importing videos, audio files or
+pdfs with the Dropbox importer will also grant you to use the presenter templates
+for video pattern recognition, sound pattern recognition or documents transcription,
+respectively, with no additional modifications and have them working right away
+(as long as the files have any of the mentioned file extensions, of course).
+
+These are the steps:
+
+1. Navigate to your project's page and click in the **Tasks** section:
+
+.. image:: http://i.imgur.com/u5vusQR.png
+
+2. Then click on the **Import Tasks** button, and select the **Flickr importer**:
+
+.. image:: http://i.imgur.com/e9GhNlE.png
+
+3. Click on the "Choose from Dropbox" icon. You will be asked your Dropbox
+account credentials. then select as many files as you want:
+
+.. image:: http://i.imgur.com/It2I1H3.png
+
+4. You can repeat step 3 as many times as you want, and more files will be added
+to your import.
+
+5. When you're ready, click on "Import", and that's all:
+
+.. image:: http://i.imgur.com/0bzRc2b.png
+
 Flushing all the tasks
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -278,7 +428,7 @@ tasks and associated task runs** from your project.
     delete all the tasks.**
 
 If you are sure that you want to flush all the tasks and task runs for your
-project, go to the project page (http://server/app/slug/tasks/) and click in
+project, go to the project page (http://server/project/slug/tasks/) and click in
 the **Settings** option of the left local navigation menu:
 
 .. image:: http://i.imgur.com/XsAOjnb.png
@@ -311,7 +461,7 @@ to access your project URL to work with your project. If your project
 *slug* or *short name* is *flickrperson* you will be able to access the
 project managing options in this URL::
 
-    http://PYBOSSA-SERVER/app/flickrperson
+    http://PYBOSSA-SERVER/project/flickrperson
 
 .. note::
     
@@ -381,7 +531,7 @@ Creating a project using the API involves also three steps:
 Creating the project
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can create a project via the API URL **/api/app** with a POST request (See
+You can create a project via the API URL **/api/project** with a POST request (See
 :ref:`api`).
 
 You have to provide the following information about the project and convert
@@ -430,7 +580,7 @@ that should have the link to the photo that we want to identify:
     info = dict (link=photo['link'], 
                  url=photo['url_m'],
                  question='Do you see a human face in this photo?')
-    data = dict (app_id=app_id,
+    data = dict (project_id=project_id,
                  state=0,
                  info=info,
                  calibration=0,
@@ -505,14 +655,14 @@ with your own editor, or using the PyBossa interface (see previous section).
     This API-KEY should be passed as a POST argument like this with the
     previous data:
 
-    [POST] http://domain/api/app/?api_key=API-KEY
+    [POST] http://domain/api/project/?api_key=API-KEY
 
 We recommend to read the 
 :doc:`Step by step tutorial on
 creating a Project <tutorial>`, as you will understand
 how to create the task presenter, which is basically adding some HTML skeleton
 to load the task data, input fields to get the answer of the users, and some
-JavaScript to make it to work.
+JavaScript to make it work.
 
 Using PyBossa API from the command line
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

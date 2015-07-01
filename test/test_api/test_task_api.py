@@ -19,11 +19,12 @@ import json
 from default import db, with_context
 from nose.tools import assert_equal
 from test_api import TestAPI
-from pybossa.model.task import Task
-from pybossa.model.task_run import TaskRun
+from mock import patch, call
 
-from factories import AppFactory, TaskFactory, TaskRunFactory, UserFactory
+from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 
+from pybossa.repositories import TaskRepository
+task_repo = TaskRepository(db)
 
 
 class TestTaskAPI(TestAPI):
@@ -32,8 +33,8 @@ class TestTaskAPI(TestAPI):
     @with_context
     def test_task_query_without_params(self):
         """ Test API Task query"""
-        app = AppFactory.create()
-        TaskFactory.create_batch(10, app=app, info={'question': 'answer'})
+        project = ProjectFactory.create()
+        TaskFactory.create_batch(10, project=project, info={'question': 'answer'})
         res = self.app.get('/api/task')
         tasks = json.loads(res.data)
         assert len(tasks) == 10, tasks
@@ -47,35 +48,35 @@ class TestTaskAPI(TestAPI):
     @with_context
     def test_task_query_with_params(self):
         """Test API query for task with params works"""
-        app = AppFactory.create()
-        TaskFactory.create_batch(10, app=app)
+        project = ProjectFactory.create()
+        TaskFactory.create_batch(10, project=project)
         # Test for real field
-        res = self.app.get("/api/task?app_id=1")
+        res = self.app.get("/api/task?project_id=1")
         data = json.loads(res.data)
         # Should return one result
         assert len(data) == 10, data
         # Correct result
-        assert data[0]['app_id'] == 1, data
+        assert data[0]['project_id'] == 1, data
 
         # Valid field but wrong value
-        res = self.app.get("/api/task?app_id=99999999")
+        res = self.app.get("/api/task?project_id=99999999")
         data = json.loads(res.data)
         assert len(data) == 0, data
 
         # Multiple fields
-        res = self.app.get('/api/task?app_id=1&state=ongoing')
+        res = self.app.get('/api/task?project_id=1&state=ongoing')
         data = json.loads(res.data)
         # One result
         assert len(data) == 10, data
         # Correct result
-        assert data[0]['app_id'] == 1, data
+        assert data[0]['project_id'] == 1, data
         assert data[0]['state'] == u'ongoing', data
 
         # Limits
-        res = self.app.get("/api/task?app_id=1&limit=5")
+        res = self.app.get("/api/task?project_id=1&limit=5")
         data = json.loads(res.data)
         for item in data:
-            assert item['app_id'] == 1, item
+            assert item['project_id'] == 1, item
         assert len(data) == 5, data
 
 
@@ -85,9 +86,9 @@ class TestTaskAPI(TestAPI):
         admin = UserFactory.create()
         user = UserFactory.create()
         non_owner = UserFactory.create()
-        app = AppFactory.create(owner=user)
-        data = dict(app_id=app.id, state='0', info='my task data')
-        root_data = dict(app_id=app.id, state='0', info='my root task data')
+        project = ProjectFactory.create(owner=user)
+        data = dict(project_id=project.id, info='my task data')
+        root_data = dict(project_id=project.id, info='my root task data')
 
         # anonymous user
         # no api-key
@@ -99,7 +100,7 @@ class TestTaskAPI(TestAPI):
         res = self.app.post('/api/task?api_key=' + non_owner.api_key,
                             data=json.dumps(data))
 
-        error_msg = 'Should not be able to post tasks for apps of others'
+        error_msg = 'Should not be able to post tasks for projects of others'
         assert_equal(res.status, '403 FORBIDDEN', error_msg)
 
         # now a real user
@@ -107,24 +108,20 @@ class TestTaskAPI(TestAPI):
                             data=json.dumps(data))
         assert res.data, res
         datajson = json.loads(res.data)
-        out = db.session.query(Task)\
-                .filter_by(id=datajson['id'])\
-                .one()
+        out = task_repo.get_task(datajson['id'])
         assert out, out
         assert_equal(out.info, 'my task data'), out
-        assert_equal(out.app_id, app.id)
+        assert_equal(out.project_id, project.id)
 
         # now the root user
         res = self.app.post('/api/task?api_key=' + admin.api_key,
                             data=json.dumps(root_data))
         assert res.data, res
         datajson = json.loads(res.data)
-        out = db.session.query(Task)\
-                .filter_by(id=datajson['id'])\
-                .one()
+        out = task_repo.get_task(datajson['id'])
         assert out, out
         assert_equal(out.info, 'my root task data'), out
-        assert_equal(out.app_id, app.id)
+        assert_equal(out.project_id, project.id)
 
         # POST with not JSON data
         url = '/api/task?api_key=%s' % user.api_key
@@ -155,6 +152,34 @@ class TestTaskAPI(TestAPI):
         assert err['action'] == 'POST', err
         assert err['exception_cls'] == 'TypeError', err
 
+    def test_task_post_with_reserved_fields_returns_error(self):
+        user = UserFactory.create()
+        project = ProjectFactory.create(owner=user)
+        data = {'created': 'today',
+                'state': 'completed',
+                'id': 222, 'project_id': project.id}
+
+        res = self.app.post('/api/task?api_key=' + user.api_key,
+                            data=json.dumps(data))
+
+        assert res.status_code == 400, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_msg'] == "Reserved keys in payload", error
+
+    def test_task_put_with_reserved_fields_returns_error(self):
+        user = UserFactory.create()
+        project = ProjectFactory.create(owner=user)
+        task = TaskFactory.create(project=project)
+        url = '/api/task/%s?api_key=%s' % (task.id, user.api_key)
+        data = {'created': 'today',
+                'state': 'completed',
+                'id': 222}
+
+        res = self.app.put(url, data=json.dumps(data))
+
+        assert res.status_code == 400, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_msg'] == "Reserved keys in payload", error
 
     @with_context
     def test_task_update(self):
@@ -162,12 +187,12 @@ class TestTaskAPI(TestAPI):
         admin = UserFactory.create()
         user = UserFactory.create()
         non_owner = UserFactory.create()
-        app = AppFactory.create(owner=user)
-        task = TaskFactory.create(app=app)
-        root_task = TaskFactory.create(app=app)
-        data = {'state': '1'}
+        project = ProjectFactory.create(owner=user)
+        task = TaskFactory.create(project=project)
+        root_task = TaskFactory.create(project=project)
+        data = {'n_answers': 1}
         datajson = json.dumps(data)
-        root_data = {'state': '4'}
+        root_data = {'n_answers': 4}
         root_datajson = json.dumps(root_data)
 
         ## anonymous
@@ -183,14 +208,14 @@ class TestTaskAPI(TestAPI):
         res = self.app.put(url, data=datajson)
         out = json.loads(res.data)
         assert_equal(res.status, '200 OK', res.data)
-        assert_equal(task.state, data['state'])
+        assert_equal(task.n_answers, data['n_answers'])
         assert task.id == out['id'], out
 
         ### root
         res = self.app.put('/api/task/%s?api_key=%s' % (root_task.id, admin.api_key),
                            data=root_datajson)
         assert_equal(res.status, '200 OK', res.data)
-        assert_equal(root_task.state, root_data['state'])
+        assert_equal(root_task.n_answers, root_data['n_answers'])
 
         # PUT with not JSON data
         res = self.app.put(url, data=data)
@@ -227,9 +252,9 @@ class TestTaskAPI(TestAPI):
         admin = UserFactory.create()
         user = UserFactory.create()
         non_owner = UserFactory.create()
-        app = AppFactory.create(owner=user)
-        task = TaskFactory.create(app=app)
-        root_task = TaskFactory.create(app=app)
+        project = ProjectFactory.create(owner=user)
+        task = TaskFactory.create(project=project)
+        root_task = TaskFactory.create(project=project)
 
         ## anonymous
         res = self.app.delete('/api/task/%s' % task.id)
@@ -263,11 +288,24 @@ class TestTaskAPI(TestAPI):
         res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.data)
 
-        tasks = db.session.query(Task)\
-                  .filter_by(app_id=app.id)\
-                  .all()
+        tasks = task_repo.filter_tasks_by(project_id=project.id)
         assert task not in tasks, tasks
         assert root_task not in tasks, tasks
+
+
+    @patch('pybossa.repositories.task_repository.uploader')
+    def test_task_delete_deletes_zip_files(self, uploader):
+        """Test API task delete deletes also zip files with tasks and taskruns"""
+        admin = UserFactory.create()
+        project = ProjectFactory.create(owner=admin)
+        task = TaskFactory.create(project=project)
+        url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
+        res = self.app.delete(url)
+        expected = [call('1_project1_task_json.zip', 'user_1'),
+                    call('1_project1_task_csv.zip', 'user_1'),
+                    call('1_project1_task_run_json.zip', 'user_1'),
+                    call('1_project1_task_run_csv.zip', 'user_1')]
+        assert uploader.delete_file.call_args_list == expected
 
 
     @with_context
@@ -275,11 +313,9 @@ class TestTaskAPI(TestAPI):
         """Test API delete task deletes associated taskruns"""
         task = TaskFactory.create()
         task_runs = TaskRunFactory.create_batch(3, task=task)
-        url = '/api/task/%s?api_key=%s' % (task.id, task.app.owner.api_key)
+        url = '/api/task/%s?api_key=%s' % (task.id, task.project.owner.api_key)
         res = self.app.delete(url)
 
         assert_equal(res.status, '204 NO CONTENT', res.data)
-        task_runs = db.session.query(TaskRun)\
-                      .filter_by(task_id=task.id)\
-                      .all()
+        task_runs = task_repo.filter_task_runs_by(task_id=task.id)
         assert len(task_runs) == 0, "There should not be any task run for task"

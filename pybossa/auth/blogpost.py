@@ -16,42 +16,43 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
-from flask.ext.login import current_user
-import pybossa.model as model
-from pybossa.core import db
 
+class BlogpostAuth(object):
 
-def create(blogpost=None, app_id=None):
-    if current_user.is_anonymous() or (blogpost is None and app_id is None):
-        return False
-    app = _get_app(blogpost, app_id)
-    if blogpost is None:
-        return app.owner_id == current_user.id
-    return blogpost.user_id == app.owner_id == current_user.id
+    def __init__(self, project_repo):
+        self.project_repo = project_repo
 
+    def can(self, user, action, blogpost=None, project_id=None):
+        action = ''.join(['_', action])
+        return getattr(self, action)(user, blogpost, project_id)
 
-def read(blogpost=None, app_id=None):
-    app = _get_app(blogpost, app_id)
-    if app and not app.hidden:
-        return True
-    if current_user.is_anonymous() or (blogpost is None and app_id is None):
-        return False
-    return current_user.admin or current_user.id == app.owner_id
+    def _create(self, user, blogpost=None, project_id=None):
+        if user.is_anonymous() or (blogpost is None and project_id is None):
+            return False
+        project = self._get_project(blogpost, project_id)
+        if blogpost is None:
+            return project.owner_id == user.id
+        return blogpost.user_id == project.owner_id == user.id
 
+    def _read(self, user, blogpost=None, project_id=None):
+        project = self._get_project(blogpost, project_id)
+        if project and not project.hidden:
+            return True
+        if user.is_anonymous() or (blogpost is None and project_id is None):
+            return False
+        return user.admin or user.id == project.owner_id
 
-def update(blogpost):
-    if current_user.is_anonymous():
-        return False
-    return blogpost.user_id == current_user.id
+    def _update(self, user, blogpost, project_id=None):
+        if user.is_anonymous():
+            return False
+        return blogpost.user_id == user.id
 
+    def _delete(self, user, blogpost, project_id=None):
+        if user.is_anonymous():
+            return False
+        return user.admin or blogpost.user_id == user.id
 
-def delete(blogpost):
-    if current_user.is_anonymous():
-        return False
-    return current_user.admin or blogpost.user_id == current_user.id
-
-
-def _get_app(blogpost, app_id):
-    if blogpost is not None:
-        return db.session.query(model.app.App).get(blogpost.app_id)
-    return db.session.query(model.app.App).get(app_id)
+    def _get_project(self, blogpost, project_id):
+        if blogpost is not None:
+            return self.project_repo.get(blogpost.project_id)
+        return self.project_repo.get(project_id)

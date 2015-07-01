@@ -19,39 +19,63 @@
 import inspect
 from flask import abort
 from flask.ext.login import current_user
+from pybossa.core import task_repo, project_repo
 
-import app
+import project
 import task
 import taskrun
 import category
 import user
 import token
 import blogpost
+import auditlog
 
-class Requirement(object):
-    """ Checks a function call and raises an exception if the
-    function returns a non-True value. """
+assert project
+assert task
+assert taskrun
+assert category
+assert user
+assert token
+assert blogpost
+assert auditlog
 
-    def __init__(self, wrapped):
-        self.wrapped = wrapped
 
-    def __getattr__(self, attr):
-        real = getattr(self.wrapped, attr)
-        return Requirement(real)
+_actions = ['create', 'read', 'update', 'delete']
+_auth_classes = {'project': project.ProjectAuth,
+                 'auditlog': auditlog.AuditlogAuth,
+                 'blogpost': blogpost.BlogpostAuth,
+                 'category': category.CategoryAuth,
+                 'task': task.TaskAuth,
+                 'taskrun': taskrun.TaskRunAuth,
+                 'token': token.TokenAuth,
+                 'user': user.UserAuth}
 
-    def __call__(self, *args, **kwargs):
-        fc = self.wrapped(*args, **kwargs)
-        if fc is False:
-            if current_user.is_anonymous():
-                raise abort(401)
-            else:
-                raise abort(403)
-        return fc
 
-    @classmethod
-    def here(cls):
-        module = inspect.getmodule(cls)
-        return cls(module)
+def is_authorized(user, action, resource, **kwargs):
+    assert action in _actions, "%s is not a valid action" % action
+    is_class = inspect.isclass(resource)
+    name = resource.__name__ if is_class else resource.__class__.__name__
+    if resource == 'token':
+        name = resource
+    resource = None if is_class else resource
+    auth = _authorizer_for(name.lower())
+    return auth.can(user, action, resource, **kwargs)
 
-require = Requirement.here()
 
+def ensure_authorized_to(action, resource, **kwargs):
+    authorized = is_authorized(current_user, action, resource, **kwargs)
+    if authorized is False:
+        if current_user.is_anonymous():
+            raise abort(401)
+        else:
+            raise abort(403)
+    return authorized
+
+
+def _authorizer_for(resource_name):
+    kwargs = {}
+    if resource_name == 'taskrun':
+        kwargs = {'task_repo': task_repo, 'project_repo': project_repo}
+    if resource_name in ['auditlog', 'blogpost', 'task']:
+        kwargs = {'project_repo': project_repo}
+    return _auth_classes[resource_name](**kwargs)

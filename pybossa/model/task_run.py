@@ -18,11 +18,9 @@
 
 from sqlalchemy import Integer, Text
 from sqlalchemy.schema import Column, ForeignKey
-from sqlalchemy import event
 
 from pybossa.core import db
-from pybossa.model import DomainObject, JSONType, make_timestamp, update_redis
-
+from pybossa.model import DomainObject, JSONType, make_timestamp
 
 
 
@@ -36,7 +34,7 @@ class TaskRun(db.Model, DomainObject):
     #: UTC timestamp for when TaskRun is created.
     created = Column(Text, default=make_timestamp)
     #: Project.id of the project associated with this TaskRun.
-    app_id = Column(Integer, ForeignKey('app.id'), nullable=False)
+    project_id = Column(Integer, ForeignKey('project.id'), nullable=False)
     #: Task.id of the task associated with this TaskRun.
     task_id = Column(Integer, ForeignKey('task.id', ondelete='CASCADE'),
                      nullable=False)
@@ -56,49 +54,3 @@ class TaskRun(db.Model, DomainObject):
             whatever information should be recorded -- up to task presenter
         }
     '''
-
-
-@event.listens_for(TaskRun, 'after_insert')
-def update_task_state(mapper, conn, target):
-    """Update the task.state when n_answers condition is met."""
-    # Get app details
-    sql_query = ('select name, short_name, info from app \
-                 where id=%s') % target.app_id
-    results = conn.execute(sql_query)
-    app_obj = dict(id=target.app_id,
-                   name=None,
-                   short_name=None,
-                   info=None,
-                   action_updated='TaskCompleted')
-    for r in results:
-        app_obj['name'] = r.name
-        app_obj['short_name'] = r.short_name
-        app_obj['info'] = r.info
-
-    # Check if user is Authenticated
-    if target.user_id is not None:
-        sql_query = ('select fullname, name, info from "user" \
-                     where id=%s') % target.user_id
-        results = conn.execute(sql_query)
-        for r in results:
-            obj = dict(id=target.user_id,
-                       name=r.name,
-                       fullname=r.fullname,
-                       info=r.info,
-                       app_name=app_obj['name'],
-                       app_short_name=app_obj['short_name'],
-                       action_updated='UserContribution')
-        # Add the event
-        update_redis(obj)
-    # Check if Task.state should be updated
-    sql_query = ('select count(id) from task_run \
-                 where task_run.task_id=%s') % target.task_id
-    n_answers = conn.scalar(sql_query)
-    sql_query = ('select n_answers from task \
-                 where task.id=%s') % target.task_id
-    task_n_answers = conn.scalar(sql_query)
-    if (n_answers) >= task_n_answers:
-        sql_query = ("UPDATE task SET state=\'completed\' \
-                     where id=%s") % target.task_id
-        conn.execute(sql_query)
-        update_redis(app_obj)

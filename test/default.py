@@ -16,10 +16,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
+from sqlalchemy import text
 from pybossa.core import db
-#from pybossa.model import rebuild_db
 from pybossa.core import create_app, sentinel
-from pybossa.model.app import App
+from pybossa.model.project import Project
 from pybossa.model.category import Category
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
@@ -43,8 +43,20 @@ def with_context(f):
             return f(*args, **kwargs)
     return decorated_function
 
+def delete_materialized_views():
+    """Delete materialized views."""
+    sql = text('''SELECT relname
+               FROM pg_class WHERE relname LIKE '%dashboard%';''')
+    results = db.session.execute(sql)
+    for row in results:
+        sql = 'drop materialized view if exists %s' % row.relname
+        db.session.execute(sql)
+        db.session.commit()
+
+
 def rebuild_db():
     """Rebuild the DB."""
+    delete_materialized_views()
     db.drop_all()
     db.create_all()
 
@@ -59,6 +71,7 @@ class Test(object):
 
     def tearDown(self):
         with self.flask_app.app_context():
+            delete_materialized_views()
             db.session.remove()
             self.redis_flushall()
             reset_all_pk_sequences()
@@ -74,8 +87,8 @@ class Test(object):
     api_key = 'tester'
     api_key_2 = 'tester-2'
     root_api_key = 'root'
-    app_name = u'My New Project'
-    app_short_name = u'test-app'
+    project_name = u'My New Project'
+    project_short_name = u'test-app'
     password = u'tester'
     root_password = password + 'root'
     cat_1 = 'thinking'
@@ -90,8 +103,8 @@ class Test(object):
             'sched': sched
             }
 
-        app = self.create_project(info)
-        app.owner = user
+        project = self.create_project(info)
+        project.owner = user
 
         db.session.add(root)
         db.session.commit()
@@ -99,7 +112,7 @@ class Test(object):
         db.session.commit()
         db.session.add(user2)
         db.session.commit()
-        db.session.add(app)
+        db.session.add(project)
 
 
         task_info = {
@@ -110,9 +123,9 @@ class Test(object):
             'answer': u'annakarenina'
             }
 
-        # Create the task and taskruns for the first app
+        # Create the task and taskruns for the first project
         for i in range (0,10):
-             task, task_run = self.create_task_and_run(task_info, task_run_info, app, user,i)
+             task, task_run = self.create_task_and_run(task_info, task_run_info, project, user,i)
              db.session.add_all([task, task_run])
         db.session.commit()
         db.session.remove()
@@ -127,10 +140,10 @@ class Test(object):
             'sched': sched
             }
 
-        app = self.create_project(info)
-        app.owner = user
+        project = self.create_project(info)
+        project.owner = user
 
-        db.session.add_all([root, user, user2, app])
+        db.session.add_all([root, user, user2, project])
 
         task_info = {
             'question': 'My random question',
@@ -140,8 +153,8 @@ class Test(object):
             'answer': u'annakarenina'
             }
 
-        # Create the task and taskruns for the first app
-        task, task_run = self.create_task_and_run(task_info, task_run_info, app, user,1)
+        # Create the task and taskruns for the first project
+        task, task_run = self.create_task_and_run(task_info, task_run_info, project, user,1)
         db.session.add_all([task, task_run])
 
         db.session.commit()
@@ -184,30 +197,30 @@ class Test(object):
             if category is None:
                 self._create_categories()
                 category = db.session.query(Category).first()
-            app = App(
-                    name=self.app_name,
-                    short_name=self.app_short_name,
+            project = Project(
+                    name=self.project_name,
+                    short_name=self.project_short_name,
                     description=u'description',
                     hidden=0,
                     category_id=category.id,
                     info=info
                 )
-            return app
+            return project
 
-    def create_task_and_run(self,task_info, task_run_info, app, user, order):
-        task = Task(app_id = 1, state = '0', info = task_info, n_answers=10)
-        task.app = app
+    def create_task_and_run(self,task_info, task_run_info, project, user, order):
+        task = Task(project_id = 1, state = '0', info = task_info, n_answers=10)
+        task.project = project
         # Taskruns will be assigned randomly to a signed user or an anonymous one
         if random.randint(0,1) == 1:
             task_run = TaskRun(
-                    app_id = 1,
+                    project_id = 1,
                     task_id = 1,
                     user_id = 1,
                     info = task_run_info)
             task_run.user = user
         else:
             task_run = TaskRun(
-                    app_id = 1,
+                    project_id = 1,
                     task_id = 1,
                     user_ip = '127.0.0.%s' % order,
                     info = task_run_info)
@@ -237,8 +250,8 @@ class Fixtures:
     api_key = 'tester'
     api_key_2 = 'tester-2'
     root_api_key = 'root'
-    app_name = u'My New Project'
-    app_short_name = u'test-app'
+    project_name = u'My New Project'
+    project_short_name = u'test-app'
     password = u'tester'
     root_password = password + 'root'
     cat_1 = 'thinking'
@@ -254,8 +267,8 @@ class Fixtures:
             'sched': sched
             }
 
-        app = Fixtures.create_project(info)
-        app.owner = user
+        project = Fixtures.create_project(info)
+        project.owner = user
 
         db.session.add(root)
         db.session.commit()
@@ -263,7 +276,7 @@ class Fixtures:
         db.session.commit()
         db.session.add(user2)
         db.session.commit()
-        db.session.add(app)
+        db.session.add(project)
 
 
         task_info = {
@@ -274,9 +287,9 @@ class Fixtures:
             'answer': u'annakarenina'
             }
 
-        # Create the task and taskruns for the first app
+        # Create the task and taskruns for the first project
         for i in range (0,10):
-             task, task_run = Fixtures.create_task_and_run(task_info, task_run_info, app, user,i)
+             task, task_run = Fixtures.create_task_and_run(task_info, task_run_info, project, user,i)
              db.session.add_all([task, task_run])
         db.session.commit()
         db.session.remove()
@@ -292,10 +305,10 @@ class Fixtures:
             'sched': sched
             }
 
-        app = Fixtures.create_project(info)
-        app.owner = user
+        project = Fixtures.create_project(info)
+        project.owner = user
 
-        db.session.add_all([root, user, user2, app])
+        db.session.add_all([root, user, user2, project])
 
         task_info = {
             'question': 'My random question',
@@ -305,8 +318,8 @@ class Fixtures:
             'answer': u'annakarenina'
             }
 
-        # Create the task and taskruns for the first app
-        task, task_run = Fixtures.create_task_and_run(task_info, task_run_info, app, user,1)
+        # Create the task and taskruns for the first project
+        task, task_run = Fixtures.create_task_and_run(task_info, task_run_info, project, user,1)
         db.session.add_all([task, task_run])
 
         db.session.commit()
@@ -349,31 +362,31 @@ class Fixtures:
         if category is None:
             cls.create_categories()
             category = db.session.query(Category).first()
-        app = App(
-                name=cls.app_name,
-                short_name=cls.app_short_name,
+        project = Project(
+                name=cls.project_name,
+                short_name=cls.project_short_name,
                 description=u'description',
                 hidden=0,
                 category_id=category.id,
                 info=info
             )
-        return app
+        return project
 
     @classmethod
-    def create_task_and_run(cls,task_info, task_run_info, app, user, order):
-        task = Task(app_id = 1, state = '0', info = task_info, n_answers=10)
-        task.app = app
+    def create_task_and_run(cls,task_info, task_run_info, project, user, order):
+        task = Task(project_id = 1, state = '0', info = task_info, n_answers=10)
+        task.project = project
         # Taskruns will be assigned randomly to a signed user or an anonymous one
         if random.randint(0,1) == 1:
             task_run = TaskRun(
-                    app_id = 1,
+                    project_id = 1,
                     task_id = 1,
                     user_id = 1,
                     info = task_run_info)
             task_run.user = user
         else:
             task_run = TaskRun(
-                    app_id = 1,
+                    project_id = 1,
                     task_id = 1,
                     user_ip = '127.0.0.%s' % order,
                     info = task_run_info)
@@ -384,8 +397,8 @@ class Fixtures:
     def create_categories(cls):
         names = [cls.cat_1, cls.cat_2]
         db.session.add_all([Category(name=c_name,
-                                           short_name=c_name.lower().replace(" ",""),
-                                           description=c_name)
+                                     short_name=c_name.lower().replace(" ", ""),
+                                     description=c_name)
                             for c_name in names])
         db.session.commit()
 
@@ -399,3 +412,8 @@ def assert_not_raises(exception, call, *args, **kwargs):
         assert True
     except exception as ex:
         assert False, str(ex)
+
+
+class FakeResponse(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(**kwargs)

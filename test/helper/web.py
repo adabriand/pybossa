@@ -19,7 +19,6 @@
 from mock import patch
 
 from default import Test, db, Fixtures, with_context
-from pybossa.model.app import App
 from pybossa.model.category import Category
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
@@ -69,6 +68,7 @@ class Helper(Test):
     def update_profile(self, method="POST", id=1, fullname="John Doe",
                        name="johndoe", locale="es",
                        email_addr="johndoe@example.com",
+                       subscribed=False,
                        new_name=None,
                        btn='Profile'):
         """Helper function to update the profile of users"""
@@ -101,38 +101,38 @@ class Helper(Test):
                 self._create_categories()
 
 
-    def new_application(self, method="POST", name="Sample Project",
+    def new_project(self, method="POST", name="Sample Project",
                         short_name="sampleapp", description="Description",
                         long_description=u'Long Description\n================'):
         """Helper function to create a project"""
         if method == "POST":
             self.create_categories()
-            return self.app.post("/app/new", data={
+            return self.app.post("/project/new", data={
                 'name': name,
                 'short_name': short_name,
                 'description': description,
                 'long_description': long_description,
             }, follow_redirects=True)
         else:
-            return self.app.get("/app/new", follow_redirects=True)
+            return self.app.get("/project/new", follow_redirects=True)
 
-    def new_task(self, appid):
+    def new_task(self, project_id):
         """Helper function to create tasks for a project"""
         tasks = []
         for i in range(0, 10):
-            tasks.append(Task(app_id=appid, state='0', info={}))
+            tasks.append(Task(project_id=project_id, state='0', info={}))
         db.session.add_all(tasks)
         db.session.commit()
 
-    def delete_task_runs(self, app_id=1):
-        """Deletes all TaskRuns for a given app_id"""
-        db.session.query(TaskRun).filter_by(app_id=1).delete()
+    def delete_task_runs(self, project_id=1):
+        """Deletes all TaskRuns for a given project_id"""
+        db.session.query(TaskRun).filter_by(project_id=1).delete()
         db.session.commit()
 
     def task_settings_scheduler(self, method="POST", short_name='sampleapp',
                                 sched="default"):
         """Helper function to modify task scheduler"""
-        url = "/app/%s/tasks/scheduler" % short_name
+        url = "/project/%s/tasks/scheduler" % short_name
         if method == "POST":
             return self.app.post(url, data={
                 'sched': sched,
@@ -143,7 +143,7 @@ class Helper(Test):
     def task_settings_redundancy(self, method="POST", short_name='sampleapp',
                                  n_answers=30):
         """Helper function to modify task redundancy"""
-        url = "/app/%s/tasks/redundancy" % short_name
+        url = "/project/%s/tasks/redundancy" % short_name
         if method == "POST":
             return self.app.post(url, data={
                 'n_answers': n_answers,
@@ -154,7 +154,7 @@ class Helper(Test):
     def task_settings_priority(self, method="POST", short_name='sampleapp',
                                  task_ids="1", priority_0=0.0):
         """Helper function to modify task redundancy"""
-        url = "/app/%s/tasks/priority" % short_name
+        url = "/project/%s/tasks/priority" % short_name
         if method == "POST":
             return self.app.post(url, data={
                 'task_ids': task_ids,
@@ -163,16 +163,16 @@ class Helper(Test):
         else:
             return self.app.get(url, follow_redirects=True)
 
-    def delete_application(self, method="POST", short_name="sampleapp"):
+    def delete_project(self, method="POST", short_name="sampleapp"):
         """Helper function to delete a project"""
         if method == "POST":
-            return self.app.post("/app/%s/delete" % short_name,
+            return self.app.post("/project/%s/delete" % short_name,
                                  follow_redirects=True)
         else:
-            return self.app.get("/app/%s/delete" % short_name,
+            return self.app.get("/project/%s/delete" % short_name,
                                 follow_redirects=True)
 
-    def update_application(self, method="POST", short_name="sampleapp", id=1,
+    def update_project(self, method="POST", short_name="sampleapp", id=1,
                            new_name="Sample Project", new_short_name="sampleapp",
                            new_description="Description",
                            new_allow_anonymous_contributors="False",
@@ -180,11 +180,12 @@ class Helper(Test):
                            new_long_description="Long desc",
                            new_sched="random",
                            new_hidden=False,
+                           new_webhook='http://server.com',
                            new_password=''):
         """Helper function to update a project"""
         if method == "POST":
             if new_hidden:
-                return self.app.post("/app/%s/update" % short_name,
+                return self.app.post("/project/%s/update" % short_name,
                                      data={
                                          'id': id,
                                          'name': new_name,
@@ -195,11 +196,12 @@ class Helper(Test):
                                          'long_description': new_long_description,
                                          'sched': new_sched,
                                          'hidden': new_hidden,
+                                         'webhook': new_webhook,
                                          'password': new_password,
                                          'btn': 'Save'},
                                      follow_redirects=True)
             else:
-                return self.app.post("/app/%s/update" % short_name,
+                return self.app.post("/project/%s/update" % short_name,
                                      data={'id': id, 'name': new_name,
                                            'short_name': new_short_name,
                                            'allow_anonymous_contributors': new_allow_anonymous_contributors,
@@ -208,9 +210,10 @@ class Helper(Test):
                                            'sched': new_sched,
                                            'description': new_description,
                                            'password': new_password,
+                                           'webhook': new_webhook,
                                            'btn': 'Save'
                                            },
                                      follow_redirects=True)
         else:
-            return self.app.get("/app/%s/update" % short_name,
+            return self.app.get("/project/%s/update" % short_name,
                                 follow_redirects=True)

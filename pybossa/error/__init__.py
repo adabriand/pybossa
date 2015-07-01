@@ -38,15 +38,16 @@ class ErrorStatus(object):
 
     """
 
-    error_status = {"Forbidden": 403,
-                    "NotFound": 404,
+    error_status = {"BadRequest": 400,
                     "Unauthorized": 401,
+                    "Forbidden": 403,
+                    "NotFound": 404,
                     "MethodNotAllowed": 405,
                     "TypeError": 415,
                     "ValueError": 415,
                     "DataError": 415,
                     "AttributeError": 415,
-                    "IntegrityError": 415,
+                    "DBIntegrityError": 415,
                     "TooManyRequests": 429}
 
     def format_exception(self, e, target, action):
@@ -61,13 +62,13 @@ class ErrorStatus(object):
             status = self.error_status.get(exception_cls)
         else: # pragma: no cover
             status = 500
-        if exception_cls == 'Forbidden' or exception_cls == 'Unauthorized':
+        if exception_cls in ('BadRequest', 'Forbidden','Unauthorized'):
             e.message = e.description
         error = dict(action=action.upper(),
                      status="failed",
                      status_code=status,
                      target=target,
                      exception_cls=exception_cls,
-                     exception_msg=e.message)
+                     exception_msg=str(e.message))
         return Response(json.dumps(error), status=status,
                         mimetype='application/json')

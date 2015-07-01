@@ -19,16 +19,13 @@
 from sqlalchemy import Integer, Boolean, Unicode, Text, String, BigInteger
 from sqlalchemy.schema import Column, ForeignKey
 from sqlalchemy.orm import relationship, backref
-from sqlalchemy import event
 from flask.ext.login import UserMixin
 
 from pybossa.core import db, signer
-from pybossa.model import DomainObject, make_timestamp, JSONEncodedDict, make_uuid, update_redis
-from pybossa.model.app import App
+from pybossa.model import DomainObject, make_timestamp, JSONEncodedDict, make_uuid
+from pybossa.model.project import Project
 from pybossa.model.task_run import TaskRun
 from pybossa.model.blogpost import Blogpost
-
-
 
 
 class User(db.Model, DomainObject, UserMixin):
@@ -49,6 +46,7 @@ class User(db.Model, DomainObject, UserMixin):
     api_key = Column(String(length=36), default=make_uuid, unique=True)
     passwd_hash = Column(Unicode(length=254), unique=True)
     admin = Column(Boolean, default=False)
+    pro = Column(Boolean, default=False)
     privacy_mode = Column(Boolean, default=True, nullable=False)
     category = Column(Integer)
     flags = Column(Integer)
@@ -56,11 +54,15 @@ class User(db.Model, DomainObject, UserMixin):
     facebook_user_id = Column(BigInteger, unique=True)
     google_user_id = Column(String, unique=True)
     ckan_api = Column(String, unique=True)
+    newsletter_prompted = Column(Boolean, default=False)
+    valid_email = Column(Boolean, default=False)
+    confirmation_email_sent = Column(Boolean, default=False)
+    subscribed = Column(Boolean, default=True)
     info = Column(JSONEncodedDict, default=dict)
 
     ## Relationships
     task_runs = relationship(TaskRun, backref='user')
-    apps = relationship(App, backref='owner')
+    projects = relationship(Project, backref='owner')
     blogposts = relationship(Blogpost, backref='owner')
 
 
@@ -78,24 +80,3 @@ class User(db.Model, DomainObject, UserMixin):
         if self.passwd_hash:
             return signer.check_password_hash(self.passwd_hash, password)
         return False
-
-
-    @classmethod
-    def by_name(cls, name):
-        '''Lookup user by (user)name.'''
-        return db.session.query(User).filter_by(name=name).first()
-
-
-@event.listens_for(User, 'before_insert')
-def make_admin(mapper, conn, target):
-    users = conn.scalar('select count(*) from "user"')
-    if users == 0:
-        target.admin = True
-
-
-@event.listens_for(User, 'after_insert')
-def add_event(mapper, conn, target):
-    """Update PyBossa feed with new user."""
-    obj = target.dictize()
-    obj['action_updated']='User'
-    update_redis(obj)

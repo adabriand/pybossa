@@ -24,10 +24,12 @@ This package adds GET, POST, PUT and DELETE methods for:
 """
 from flask import request
 from flask.ext.login import current_user
-from api_base import APIBase
-from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
-from werkzeug.exceptions import Forbidden
+from werkzeug.exceptions import Forbidden, BadRequest
+
+from api_base import APIBase
+from pybossa.util import get_user_id_or_ip
+from pybossa.core import task_repo, sentinel
 
 
 class TaskRunAPI(APIBase):
@@ -35,18 +37,36 @@ class TaskRunAPI(APIBase):
     """Class API for domain object TaskRun."""
 
     __class__ = TaskRun
+    reserved_keys = set(['id', 'created', 'finish_time'])
 
     def _update_object(self, taskrun):
         """Update task_run object with user id or ip."""
-        # validate the task and app for that taskrun are ok
-        task = Task.query.get(taskrun.task_id)
+        # validate the task and project for that taskrun are ok
+        task = task_repo.get_task(taskrun.task_id)
         if task is None:  # pragma: no cover
             raise Forbidden('Invalid task_id')
-        if (task.app_id != taskrun.app_id):
-            raise Forbidden('Invalid app_id')
+        if (task.project_id != taskrun.project_id):
+            raise Forbidden('Invalid project_id')
+        if _check_task_requested_by_user(taskrun, sentinel.master) is False:
+            raise Forbidden('You must request a task first!')
 
         # Add the user info so it cannot post again the same taskrun
         if current_user.is_anonymous():
             taskrun.user_ip = request.remote_addr
         else:
             taskrun.user_id = current_user.id
+
+    def _forbidden_attributes(self, data):
+        for key in data.keys():
+            if key in self.reserved_keys:
+                raise BadRequest("Reserved keys in payload")
+
+
+def _check_task_requested_by_user(taskrun, redis_conn):
+    user_id_ip = get_user_id_or_ip()
+    usr = user_id_ip['user_id'] or user_id_ip['user_ip']
+    key = 'pybossa:task_requested:user:%s:task:%s' % (usr, taskrun.task_id)
+    task_requested = bool(redis_conn.get(key))
+    if user_id_ip['user_id'] is not None:
+        redis_conn.delete(key)
+    return task_requested

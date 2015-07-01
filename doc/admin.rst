@@ -35,7 +35,7 @@ Administrators can manage three different areas of the server:
     monitor all the background jobs and even cancel them or retry failed ones.
 
 .. _`RQ dashboard`: https://github.com/nvie/rq-dashboard
-.. _featured-apps:
+.. _featured-projects:
 
 Featured Projects
 =================
@@ -91,3 +91,51 @@ admin group.
 As with the :ref:`categories` section, a green button will allow you to add the user
 to the admin group, while a red button will be shown to remove the user from
 the admin group.
+
+
+Audit log
+=========
+
+When a project is created, deleted or updated, the system registers its actions
+in the server. Admins will have access to all the logged actions in every
+project page, in a section named **Audit log**.
+
+.. image:: http://i.imgur.com/UQeyHPF.png
+    :width: 100%
+
+The section will let you know the following information:
+
+- **When**: when the action was taken.
+- **Action**: which action was taken: 'created', 'updated', or 'deleted'.
+- **Source**: if it was done the action via the API or the WEB interface.
+- **Attribute**: which attribute of the project has been changed.
+- **Who**: the user who took the action.
+- **Old value**: the previous value before the action.
+- **New value**: the new value after the action.
+
+.. note::
+    Only admins and users marked as *pro* can see the audit log.
+
+Dashboard
+=========
+
+The dashboard allows you to see what's going on in your PyBossa server.
+
+.. image:: http://i.imgur.com/CpgclS1.png
+
+.. note::
+    This feature requires PostgreSQL >= 9.3. Please upgrade as soon as possible your
+    server to have this feature.
+
+The dashboard shows the following information for the last 7 days:
+
+- **Active users**: Number of users that have contributed at least 1 task_run in the last 7 days.
+- **Active anonymous users**: Number of anonymous users that have contributed at least 1 task_run in the last 7 days.
+- **New projects**: Projects created in the last 7 days.
+- **Updated projects**: Updated projects in the last 7 days.
+- **Updated projects**: Updated projects in the last 7 days.
+- **New users**: Number of new users registered in the last 7 days.
+- **Number of returning users**: Number of returning users in the last 7 days classified by number of days coming back.
+- **Recent activity feed**: Last events in real time of the server.
+
+The dashboard is updated every 24 hours via the background jobs. These jobs are scheduled in the *low* queue.

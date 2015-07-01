@@ -19,17 +19,49 @@
 
 import os
 import tempfile
-from default import Test, with_context
+from default import Test
 from pybossa.uploader.local import LocalUploader
 from mock import patch
 from werkzeug.datastructures import FileStorage
-
+from nose.tools import assert_raises
 
 class TestLocalUploader(Test):
 
     """Test PyBossa Uploader module."""
 
-    @with_context
+    def test_local_uploader_relative_directory_init(self):
+        """Test LOCAL UPLOADER init works with relative path."""
+        new_upload_folder = 'uploads'
+        new_config_uf = {'UPLOAD_FOLDER': new_upload_folder}
+        with patch.dict(self.flask_app.config, new_config_uf):
+            new_uploader = LocalUploader()
+            new_uploader.init_app(self.flask_app)
+            err_msg = "Upload folder should be absolute not relative"
+            assert os.path.isabs(new_uploader.upload_folder) is True, err_msg
+            err_msg = "Upload folder uploads should be existing"
+            assert os.path.isdir(new_uploader.upload_folder) is True, err_msg
+
+    def test_wrong_local_uploader_relative_directory_init(self):
+        """Test LOCAL UPLOADER init with wrong relative path."""
+        new_upload_folder = 'iamnotexisting'
+        err_msg = "Uploadfolder ./iamnotexisting should not exist"
+        assert os.path.isdir(new_upload_folder) is False, err_msg
+        new_config_uf = {'UPLOAD_FOLDER': new_upload_folder}
+        with patch.dict(self.flask_app.config, new_config_uf):
+            new_uploader = LocalUploader()
+            assert_raises(IOError, new_uploader.init_app, self.flask_app)   # Should raise IOError
+            err_msg = "wrong upload folder ./iamnotexisting should not exist"
+            assert os.path.isdir(new_upload_folder) is False, err_msg
+
+    def test_local_uploader_standard_directory_existing(self):
+        """Test if local uploads directory existing"""
+        uploads_path = os.path.join(os.path.dirname(self.flask_app.root_path), 'uploads')   # ../uploads
+        err_msg = "./uploads folder is not existing"
+        assert os.path.isdir(uploads_path) is True, err_msg
+        context_uploads_path = os.path.join(self.flask_app.root_path, 'uploads')            # pybossa/uploads
+        err_msg = "pybossa/uploads should not exist"
+        assert os.path.isdir(context_uploads_path) is False, err_msg
+
     def test_local_uploader_init(self):
         """Test LOCAL UPLOADER init works."""
         u = LocalUploader()
@@ -46,10 +78,11 @@ class TestLocalUploader(Test):
                                                 new_extensions)
                 err_msg = "The new uploader should support two extra extensions"
                 assert expected_extensions == new_uploader.allowed_extensions, err_msg
+                err_msg = "Upload folder /tmp should be existing"
+                assert os.path.isdir(new_uploader.upload_folder) is True, err_msg
                 err_msg = "Upload folder by default is /tmp/"
                 assert new_uploader.upload_folder == '/tmp/', err_msg
 
-    @with_context
     @patch('werkzeug.datastructures.FileStorage.save', side_effect=IOError)
     def test_local_uploader_upload_fails(self, mock):
         """Test LOCAL UPLOADER upload fails."""
@@ -61,7 +94,6 @@ class TestLocalUploader(Test):
         assert res is False, err_msg
 
 
-    @with_context
     @patch('werkzeug.datastructures.FileStorage.save', return_value=None)
     def test_local_uploader_upload_correct_file(self, mock):
         """Test LOCAL UPLOADER upload works."""
@@ -73,7 +105,6 @@ class TestLocalUploader(Test):
                    as this extension is allowed")
         assert res is True, err_msg
 
-    @with_context
     @patch('werkzeug.datastructures.FileStorage.save', return_value=None)
     def test_local_uploader_upload_wrong_file(self, mock):
         """Test LOCAL UPLOADER upload works with wrong extension."""
@@ -85,7 +116,6 @@ class TestLocalUploader(Test):
                    as this extension is not allowed")
         assert res is False, err_msg
 
-    @with_context
     @patch('werkzeug.datastructures.FileStorage.save', return_value=None)
     def test_local_folder_is_created(self, mock):
         """Test LOCAL UPLOADER folder creation works."""
@@ -99,7 +129,6 @@ class TestLocalUploader(Test):
         err_msg = "This local path should exist: %s" % path
         assert os.path.isdir(path) is True, err_msg
 
-    @with_context
     @patch('os.remove', return_value=None)
     def test_local_folder_delete(self, mock):
         """Test LOCAL UPLOADER delete works."""
@@ -107,7 +136,6 @@ class TestLocalUploader(Test):
         err_msg = "Delete should return true"
         assert u.delete_file('file', 'container') is True, err_msg
 
-    @with_context
     @patch('os.remove', side_effect=OSError)
     def test_local_folder_delete_fails(self, mock):
         """Test LOCAL UPLOADER delete fail works."""
@@ -115,3 +143,19 @@ class TestLocalUploader(Test):
         err_msg = "Delete should return False"
         assert u.delete_file('file', 'container') is False, err_msg
 
+    def test_file_exists_for_missing_file(self):
+        """Test LOCAL UPLOADER file_exists returns False if the file does not exist"""
+        u = LocalUploader()
+        container = 'mycontainer'
+
+        assert u.file_exists('noexist.txt', container) is False
+
+    def test_file_exists_for_real_file(self):
+        """Test LOCAL UPLOADER file_exists returns True if the file exists"""
+        u = LocalUploader()
+        u.upload_folder = tempfile.mkdtemp()
+        file = FileStorage(filename='test.jpg')
+        container = 'mycontainer'
+        u.upload_file(file, container=container)
+
+        assert u.file_exists('test.jpg', container) is True

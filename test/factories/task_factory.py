@@ -17,16 +17,22 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 from pybossa.model.task import Task
-from . import BaseFactory, factory
+from . import BaseFactory, factory, task_repo
 
 
 class TaskFactory(BaseFactory):
     class Meta:
         model = Task
 
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        task = model_class(*args, **kwargs)
+        task_repo.save(task)
+        return task
+
     id = factory.Sequence(lambda n: n)
-    app = factory.SubFactory('factories.AppFactory')
-    app_id = factory.LazyAttribute(lambda task: task.app.id)
+    project = factory.SubFactory('factories.ProjectFactory')
+    project_id = factory.LazyAttribute(lambda task: task.project.id)
     state = u'ongoing'
     quorum = 0
     calibration = 0

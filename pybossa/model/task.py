@@ -19,13 +19,11 @@
 from sqlalchemy import Integer, Boolean, Float, UnicodeText, Text
 from sqlalchemy.schema import Column, ForeignKey
 from sqlalchemy.orm import relationship, backref
-from sqlalchemy import event
 
 from pybossa.core import db
-from pybossa.model import DomainObject, JSONType, JSONEncodedDict, make_timestamp, update_redis
+from pybossa.model import DomainObject, JSONType, JSONEncodedDict, \
+    make_timestamp
 from pybossa.model.task_run import TaskRun
-
-
 
 
 class Task(db.Model, DomainObject):
@@ -40,7 +38,7 @@ class Task(db.Model, DomainObject):
     #: UTC timestamp when the task was created.
     created = Column(Text, default=make_timestamp)
     #: Project.ID that this task is associated with.
-    app_id = Column(Integer, ForeignKey('app.id', ondelete='CASCADE'), nullable=False)
+    project_id = Column(Integer, ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
     #: Task.state: ongoing or completed.
     state = Column(UnicodeText, default=u'ongoing')
     quorum = Column(Integer, default=0)
@@ -58,24 +56,7 @@ class Task(db.Model, DomainObject):
 
     def pct_status(self):
         """Returns the percentage of Tasks that are completed"""
-        if self.n_answers != 0 and self.n_answers != None:
+        if self.n_answers != 0 and self.n_answers is not None:
             return float(len(self.task_runs)) / self.n_answers
         else:  # pragma: no cover
             return float(0)
-
-@event.listens_for(Task, 'after_insert')
-def add_event(mapper, conn, target):
-    """Update PyBossa feed with new task."""
-    sql_query = ('select name, short_name, info from app \
-                 where id=%s') % target.app_id
-    results = conn.execute(sql_query)
-    obj = dict(id=target.app_id,
-               name=None,
-               short_name=None,
-               info=None,
-               action_updated='Task')
-    for r in results:
-        obj['name'] = r.name
-        obj['short_name'] = r.short_name
-        obj['info'] = r.info
-    update_redis(obj)

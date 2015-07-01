@@ -6,7 +6,7 @@ import inspect
 
 #import pybossa.model as model
 from pybossa.core import db, create_app
-from pybossa.model.app import App
+from pybossa.model.project import Project
 from pybossa.model.user import User
 from pybossa.model.category import Category
 
@@ -15,23 +15,10 @@ from alembic import command
 from html2text import html2text
 from sqlalchemy.sql import text
 
-app = create_app()
+app = create_app(run_as_server=False)
 
 def setup_alembic_config():
-    if "DATABASE_URL" not in os.environ:
-        alembic_cfg = Config("alembic.ini")
-    else:
-        dynamic_filename = "alembic-heroku.ini"
-        with file("alembic.ini.template") as f:
-            with file(dynamic_filename, "w") as conf:
-                for line in f.readlines():
-                    if line.startswith("sqlalchemy.url"):
-                        conf.write("sqlalchemy.url = %s\n" %
-                                   os.environ['DATABASE_URL'])
-                    else:
-                        conf.write(line)
-        alembic_cfg = Config(dynamic_filename)
-
+    alembic_cfg = Config("alembic.ini")
     command.stamp(alembic_cfg, "head")
 
 def db_create():
@@ -88,6 +75,53 @@ def markdown_db_migrate():
                            WHERE id=:id''')
                 db.engine.execute(query, long_description = new_description, id = old_desc.id)
 
+def fix_task_date():
+    """Fix Date format in Task."""
+    import re
+    from datetime import datetime
+    with app.app_context():
+        query = text('''SELECT id, created FROM task WHERE created LIKE ('%Date%')''')
+        results = db.engine.execute(query)
+        tasks = results.fetchall()
+        for task in tasks:
+            # It's in miliseconds
+            timestamp = int(re.findall(r'\d+', task.created)[0])
+            print timestamp
+            # Postgresql expects this format 2015-05-21T13:19:06.471074
+            fixed_created = datetime.fromtimestamp(timestamp/1000)\
+                                    .replace(microsecond=timestamp%1000*1000)\
+                                    .strftime('%Y-%m-%dT%H:%M:%S.%f')
+            query = text('''UPDATE task SET created=:created WHERE id=:id''')
+            db.engine.execute(query, created=fixed_created, id=task.id)
+
+
+def delete_hard_bounces():
+    '''Delete fake accounts from hard bounces.'''
+    del_users = 0
+    fake_emails = 0
+    with app.app_context():
+        with open('email.csv', 'r') as f:
+            emails = f.readlines()
+            print "Number of users: %s" % len(emails)
+            for email in emails:
+                usr = db.session.query(User).filter_by(email_addr=email.rstrip()).first()
+                if usr and len(usr.projects) == 0 and len(usr.task_runs) == 0:
+                    print "Deleting user: %s" % usr.email_addr
+                    del_users +=1
+                    db.session.delete(usr)
+                    db.session.commit()
+                else:
+                    if usr:
+                        if len(usr.projects) > 0:
+                            print "Invalid email (user owns app): %s" % usr.email_addr
+                        if len(usr.task_runs) > 0:
+                            print "Invalid email (user has contributed): %s" % usr.email_addr
+                        fake_emails +=1
+                        usr.valid_email = False
+                        db.session.commit()
+        print "%s users were deleted" % del_users
+        print "%s users have fake emails" % fake_emails
+
 
 def bootstrap_avatars():
     """Download current links from user avatar and projects to real images hosted in the
@@ -111,7 +145,7 @@ def bootstrap_avatars():
         if app.config['UPLOAD_METHOD'] == 'local':
             users = User.query.order_by('id').all()
             print "Downloading avatars for %s users" % len(users)
-            for u in users[0:10]:
+            for u in users:
                 print "Downloading avatar for %s ..." % u.name
                 container = "user_%s" % u.id
                 path = os.path.join(app.config.get('UPLOAD_FOLDER'), container)
@@ -137,9 +171,9 @@ def bootstrap_avatars():
                     print "No gravatar, this user will use the placehoder."
 
 
-            apps = App.query.all()
+            apps = Project.query.all()
             print "Downloading avatars for %s projects" % len(apps)
-            for a in apps[0:1]:
+            for a in apps:
                 if a.info.get('thumbnail') and not a.info.get('container'):
                     print "Working on project: %s ..." % a.short_name
                     print "Saving avatar: %s ..." % a.info.get('thumbnail')
@@ -207,7 +241,7 @@ def bootstrap_avatars():
                     print "No gravatar, this user will use the placehoder."
 
 
-            apps = App.query.all()
+            apps = Project.query.all()
             print "Downloading avatars for %s projects" % len(apps)
             for a in apps:
                 if a.info.get('thumbnail') and not a.info.get('container'):
@@ -313,7 +347,7 @@ def resize_avatars():
                         u.info['container'] = "user_%s" % u.id
                         db.session.commit()
                         # Save the user.id to avoid downloading it again.
-			f = open('user_id_updated_avatars.txt', 'a')
+                        f = open('user_id_updated_avatars.txt', 'a')
                         f.write("%s\n" % u.id)
                         # delete old avatar
                         obj = cont.get_object(old_avatar)
@@ -339,7 +373,7 @@ def resize_project_avatars():
         import requests
         from PIL import Image
         import time
-        import pybossa.cache.apps as cached_apps
+        import pybossa.cache.projects as cached_apps
         # Disable cache to update the data in it :-)
         os.environ['PYBOSSA_REDIS_CACHE_DISABLED'] = '1'
         pyrax.set_setting("identity_type", "rackspace")
@@ -349,15 +383,15 @@ def resize_project_avatars():
 
         cf = pyrax.cloudfiles
 
-        #apps = App.query.all()
+        #apps = Project.query.all()
         file_name = 'project_id_updated_thumbnails.txt'
         project_id_updated_thumbnails = []
         if os.path.isfile(file_name):
             f = open(file_name, 'r')
             project_id_updated_thumbnails = f.readlines()
             f.close()
-        apps = App.query.filter(~App.id.in_(project_id_updated_thumbnails)).all()
-        #apps = [App.query.get(2042)]
+        apps = Project.query.filter(~Project.id.in_(project_id_updated_thumbnails)).all()
+        #apps = [Project.query.get(2042)]
         print "Downloading avatars for %s projects" % len(apps)
         dirpath = tempfile.mkdtemp()
         f = open(file_name, 'a')
@@ -493,5 +527,3 @@ __all__ = [ '_main' ]
 
 if __name__ == '__main__':
     _main(locals())
-
-

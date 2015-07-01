@@ -31,7 +31,7 @@ class Uploader(object):
 
     """Generic uploader class."""
 
-    allowed_extensions = set(['js', 'css', 'png', 'jpg', 'jpeg', 'gif'])
+    allowed_extensions = set(['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'zip'])
     size = 512, 512
 
     def __init__(self, app=None):
@@ -115,6 +115,10 @@ class Uploader(object):
         # url_for will use this result, instead of raising BuildError.
         return url
 
-    def delete_file(self, name, container): # pragma: no cover
+    def delete_file(self, name, container):  # pragma: no cover
+        """Override by the uploader handler."""
+        pass
+
+    def file_exists(self, name, container):  #pragma: no cover
         """Override by the uploader handler."""
         pass

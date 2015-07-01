@@ -15,7 +15,8 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
-
+"""Admin view for PyBossa."""
+from rq import Queue
 from flask import Blueprint
 from flask import render_template
 from flask import request
@@ -28,25 +29,29 @@ from flask import Response
 from flask.ext.login import login_required, current_user
 from flask.ext.babel import gettext
 from werkzeug.exceptions import HTTPException
+from sqlalchemy.exc import ProgrammingError
 
-import pybossa.model as model
-from pybossa.core import db
+from pybossa.model.category import Category
 from pybossa.util import admin_required, UnicodeWriter
-from pybossa.cache import apps as cached_apps
+from pybossa.cache import projects as cached_projects
 from pybossa.cache import categories as cached_cat
-from pybossa.auth import require
-from sqlalchemy import or_, func
+from pybossa.auth import ensure_authorized_to
+from pybossa.core import project_repo, user_repo, sentinel
+from pybossa.feed import get_update_feed
+import pybossa.dashboard.data as dashb
+from pybossa.jobs import get_dashboard_jobs
 import json
 from StringIO import StringIO
 
 from pybossa.forms.admin_view_forms import *
 
 
-
 blueprint = Blueprint('admin', __name__)
 
+DASHBOARD_QUEUE = Queue('super', connection=sentinel.master)
 
 def format_error(msg, status_code):
+    """Return error as a JSON response."""
     error = dict(error=msg,
                  status_code=status_code)
     return Response(json.dumps(error), status=status_code,
@@ -57,55 +62,54 @@ def format_error(msg, status_code):
 @login_required
 @admin_required
 def index():
-    """List admin actions"""
+    """List admin actions."""
     return render_template('/admin/index.html')
 
 
 @blueprint.route('/featured')
-@blueprint.route('/featured/<int:app_id>', methods=['POST', 'DELETE'])
+@blueprint.route('/featured/<int:project_id>', methods=['POST', 'DELETE'])
 @login_required
 @admin_required
-def featured(app_id=None):
-    """List featured apps of PyBossa"""
+def featured(project_id=None):
+    """List featured projects of PyBossa."""
     try:
         if request.method == 'GET':
             categories = cached_cat.get_all()
-            apps = {}
+            projects = {}
             for c in categories:
-                n_apps = cached_apps.n_count(category=c.short_name)
-                apps[c.short_name] = cached_apps.get(category=c.short_name,
-                                                             page=1,
-                                                             per_page=n_apps)
-            return render_template('/admin/applications.html', apps=apps,
+                n_projects = cached_projects.n_count(category=c.short_name)
+                projects[c.short_name] = cached_projects.get(
+                    category=c.short_name,
+                    page=1,
+                    per_page=n_projects)
+            return render_template('/admin/projects.html',
+                                   projects=projects,
                                    categories=categories)
         else:
-            app = db.session.query(model.app.App).get(app_id)
-            if app:
-                require.app.update(app)
+            project = project_repo.get(project_id)
+            if project:
+                ensure_authorized_to('update', project)
                 if request.method == 'POST':
-                    cached_apps.reset()
-                    if not app.featured:
-                        app.featured = True
-                        db.session.add(app)
-                        db.session.commit()
-                        return json.dumps(app.dictize())
-                    else:
-                        msg = "App.id %s already featured" % app_id
+                    if project.featured is True:
+                        msg = "Project.id %s already featured" % project_id
                         return format_error(msg, 415)
+                    cached_projects.reset()
+                    project.featured = True
+                    project_repo.update(project)
+                    return json.dumps(project.dictize())
+
                 if request.method == 'DELETE':
-                    cached_apps.reset()
-                    if app.featured:
-                        app.featured = False
-                        db.session.add(app)
-                        db.session.commit()
-                        return json.dumps(app.dictize())
-                    else:
-                        msg = 'App.id %s is not featured' % app_id
+                    if project.featured is False:
+                        msg = 'Project.id %s is not featured' % project_id
                         return format_error(msg, 415)
+                    cached_projects.reset()
+                    project.featured = False
+                    project_repo.update(project)
+                    return json.dumps(project.dictize())
             else:
-                msg = 'App.id %s not found' % app_id
+                msg = 'Project.id %s not found' % project_id
                 return format_error(msg, 404)
-    except Exception as e: # pragma: no cover
+    except Exception as e:  # pragma: no cover
         current_app.logger.error(e)
         return abort(500)
 
@@ -114,42 +118,32 @@ def featured(app_id=None):
 @login_required
 @admin_required
 def users(user_id=None):
-    """Manage users of PyBossa"""
-    try:
-        form = SearchForm(request.form)
-        users = db.session.query(model.user.User)\
-                  .filter(model.user.User.admin == True)\
-                  .filter(model.user.User.id != current_user.id)\
-                  .all()
+    """Manage users of PyBossa."""
+    form = SearchForm(request.form)
+    users = [user for user in user_repo.filter_by(admin=True)
+             if user.id != current_user.id]
 
-        if request.method == 'POST' and form.user.data:
-            query = '%' + form.user.data.lower() + '%'
-            found = db.session.query(model.user.User)\
-                      .filter(or_(func.lower(model.user.User.name).like(query),
-                                  func.lower(model.user.User.fullname).like(query)))\
-                      .filter(model.user.User.id != current_user.id)\
-                      .all()
-            require.user.update(found)
-            if not found:
-                flash("<strong>Ooops!</strong> We didn't find a user "
-                      "matching your query: <strong>%s</strong>" % form.user.data)
-            return render_template('/admin/users.html', found=found, users=users,
-                                   title=gettext("Manage Admin Users"),
-                                   form=form)
+    if request.method == 'POST' and form.user.data:
+        query = form.user.data
+        found = [user for user in user_repo.search_by_name(query)
+                 if user.id != current_user.id]
+        [ensure_authorized_to('update', found_user) for found_user in found]
+        if not found:
+            flash("<strong>Ooops!</strong> We didn't find a user "
+                  "matching your query: <strong>%s</strong>" % form.user.data)
+        return render_template('/admin/users.html', found=found, users=users,
+                               title=gettext("Manage Admin Users"),
+                               form=form)
 
-        return render_template('/admin/users.html', found=[], users=users,
-                               title=gettext("Manage Admin Users"), form=form)
-    except Exception as e:  # pragma: no cover
-        current_app.logger.error(e)
-        return abort(500)
+    return render_template('/admin/users.html', found=[], users=users,
+                           title=gettext("Manage Admin Users"), form=form)
 
 
 @blueprint.route('/users/export')
 @login_required
 @admin_required
 def export_users():
-    """Export Users list in the given format, only for admins"""
-
+    """Export Users list in the given format, only for admins."""
     exportable_attributes = ('id', 'name', 'fullname', 'email_addr',
                              'created', 'locale', 'admin')
 
@@ -160,7 +154,7 @@ def export_users():
         return res
 
     def gen_json():
-        users = db.slave_session.query(model.user.User).all()
+        users = user_repo.get_all()
         json_users = []
         for user in users:
             json_users.append(dictize_with_exportable_attributes(user))
@@ -182,7 +176,7 @@ def export_users():
 
     def gen_csv(out, writer, write_user):
         add_headers(writer)
-        for user in db.slave_session.query(model.user.User).yield_per(1):
+        for user in user_repo.get_all():
             write_user(writer, user)
         yield out.getvalue()
 
@@ -207,20 +201,19 @@ def export_users():
 @login_required
 @admin_required
 def add_admin(user_id=None):
-    """Add admin flag for user_id"""
+    """Add admin flag for user_id."""
     try:
         if user_id:
-            user = db.session.query(model.user.User)\
-                     .get(user_id)
-            require.user.update(user)
+            user = user_repo.get(user_id)
             if user:
+                ensure_authorized_to('update', user)
                 user.admin = True
-                db.session.commit()
+                user_repo.update(user)
                 return redirect(url_for(".users"))
             else:
                 msg = "User not found"
                 return format_error(msg, 404)
-    except Exception as e: # pragma: no cover
+    except Exception as e:  # pragma: no cover
         current_app.logger.error(e)
         return abort(500)
 
@@ -229,15 +222,14 @@ def add_admin(user_id=None):
 @login_required
 @admin_required
 def del_admin(user_id=None):
-    """Del admin flag for user_id"""
+    """Del admin flag for user_id."""
     try:
         if user_id:
-            user = db.session.query(model.user.User)\
-                     .get(user_id)
-            require.user.update(user)
+            user = user_repo.get(user_id)
             if user:
+                ensure_authorized_to('update', user)
                 user.admin = False
-                db.session.commit()
+                user_repo.update(user)
                 return redirect(url_for('.users'))
             else:
                 msg = "User.id not found"
@@ -254,35 +246,36 @@ def del_admin(user_id=None):
 @login_required
 @admin_required
 def categories():
-    """List Categories"""
+    """List Categories."""
     try:
         if request.method == 'GET':
-            require.category.read()
+            ensure_authorized_to('read', Category)
             form = CategoryForm()
         if request.method == 'POST':
-            require.category.create()
+            ensure_authorized_to('create', Category)
             form = CategoryForm(request.form)
+            del form.id
             if form.validate():
                 slug = form.name.data.lower().replace(" ", "")
-                category = model.category.Category(name=form.name.data,
-                                          short_name=slug,
-                                          description=form.description.data)
-                db.session.add(category)
-                db.session.commit()
+                category = Category(name=form.name.data,
+                                    short_name=slug,
+                                    description=form.description.data)
+                project_repo.save_category(category)
                 cached_cat.reset()
                 msg = gettext("Category added")
                 flash(msg, 'success')
             else:
                 flash(gettext('Please correct the errors'), 'error')
         categories = cached_cat.get_all()
-        n_apps_per_category = dict()
+        n_projects_per_category = dict()
         for c in categories:
-            n_apps_per_category[c.short_name] = cached_apps.n_count(c.short_name)
+            n_projects_per_category[c.short_name] = \
+                cached_projects.n_count(c.short_name)
 
         return render_template('admin/categories.html',
                                title=gettext('Categories'),
                                categories=categories,
-                               n_apps_per_category=n_apps_per_category,
+                               n_projects_per_category=n_projects_per_category,
                                form=form)
     except Exception as e:  # pragma: no cover
         current_app.logger.error(e)
@@ -293,27 +286,26 @@ def categories():
 @login_required
 @admin_required
 def del_category(id):
-    """Deletes a category"""
+    """Delete a category."""
     try:
-        category = db.session.query(model.category.Category).get(id)
+        category = project_repo.get_category(id)
         if category:
             if len(cached_cat.get_all()) > 1:
-                require.category.delete(category)
+                ensure_authorized_to('delete', category)
                 if request.method == 'GET':
                     return render_template('admin/del_category.html',
                                            title=gettext('Delete Category'),
                                            category=category)
                 if request.method == 'POST':
-                    db.session.delete(category)
-                    db.session.commit()
+                    project_repo.delete_category(category)
                     msg = gettext("Category deleted")
                     flash(msg, 'success')
                     cached_cat.reset()
                     return redirect(url_for(".categories"))
             else:
-                msg = gettext('Sorry, it is not possible to delete the only \
-                                   available category. You can modify it, click the \
-                                   edit button')
+                msg = gettext('Sorry, it is not possible to delete the only'
+                              ' available category. You can modify it, '
+                              ' click the edit button')
                 flash(msg, 'warning')
                 return redirect(url_for('.categories'))
         else:
@@ -329,11 +321,11 @@ def del_category(id):
 @login_required
 @admin_required
 def update_category(id):
-    """Updates a category"""
+    """Update a category."""
     try:
-        category = db.session.query(model.category.Category).get(id)
+        category = project_repo.get_category(id)
         if category:
-            require.category.update(category)
+            ensure_authorized_to('update', category)
             form = CategoryForm(obj=category)
             form.populate_obj(category)
             if request.method == 'GET':
@@ -345,12 +337,10 @@ def update_category(id):
                 form = CategoryForm(request.form)
                 if form.validate():
                     slug = form.name.data.lower().replace(" ", "")
-                    new_category = model.category.Category(id=form.id.data,
-                                                  name=form.name.data,
-                                                  short_name=slug)
-                    # print new_category.id
-                    db.session.merge(new_category)
-                    db.session.commit()
+                    new_category = Category(id=form.id.data,
+                                            name=form.name.data,
+                                            short_name=slug)
+                    project_repo.update_category(new_category)
                     cached_cat.reset()
                     msg = gettext("Category updated")
                     flash(msg, 'success')
@@ -366,6 +356,50 @@ def update_category(id):
             abort(404)
     except HTTPException:
         raise
-    except Exception as e: # pragma: no cover
+    except Exception as e:  # pragma: no cover
+        current_app.logger.error(e)
+        return abort(500)
+
+
+@blueprint.route('/dashboard/')
+@login_required
+@admin_required
+def dashboard():
+    """Show PyBossa Dashboard."""
+    try:
+        if request.args.get('refresh') == '1':
+            db_jobs = get_dashboard_jobs()
+            for j in db_jobs:
+                DASHBOARD_QUEUE.enqueue(j['name'])
+            msg = gettext('Dashboard jobs enqueued,'
+                          ' refresh page in a few minutes')
+            flash(msg)
+        active_users_last_week = dashb.format_users_week()
+        active_anon_last_week = dashb.format_anon_week()
+        new_projects_last_week = dashb.format_new_projects()
+        update_projects_last_week = dashb.format_update_projects()
+        new_tasks_week = dashb.format_new_tasks()
+        new_task_runs_week = dashb.format_new_task_runs()
+        new_users_week = dashb.format_new_users()
+        returning_users_week = dashb.format_returning_users()
+        update_feed = get_update_feed()
+
+        return render_template('admin/dashboard.html',
+                               title=gettext('Dashboard'),
+                               active_users_last_week=active_users_last_week,
+                               active_anon_last_week=active_anon_last_week,
+                               new_projects_last_week=new_projects_last_week,
+                               update_projects_last_week=update_projects_last_week,
+                               new_tasks_week=new_tasks_week,
+                               new_task_runs_week=new_task_runs_week,
+                               new_users_week=new_users_week,
+                               returning_users_week=returning_users_week,
+                               update_feed=update_feed,
+                               wait=False)
+    except ProgrammingError as e:
+        return render_template('admin/dashboard.html',
+                               title=gettext('Dashboard'),
+                               wait=True)
+    except Exception as e:  # pragma: no cover
         current_app.logger.error(e)
         return abort(500)

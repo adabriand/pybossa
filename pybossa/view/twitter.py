@@ -15,30 +15,30 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
-from flask import Blueprint, request, url_for, flash, redirect
-from flask.ext.login import login_user, current_user
 
-from pybossa.core import db, twitter
+"""Twitter view for PyBossa."""
+from flask import Blueprint, request, url_for, flash, redirect, current_app
+from flask.ext.login import login_user, current_user
+from flask_oauthlib.client import OAuthException
+
+from pybossa.core import twitter, user_repo, newsletter
 from pybossa.model.user import User
 from pybossa.util import get_user_signup_method
-# Required to access the config parameters outside a
-# context as we are using Flask 0.8
-# See http://goo.gl/tbhgF for more info
 
-# This blueprint will be activated in web.py
-# if the TWITTER CONSUMER KEY and SECRET
-# are available
 blueprint = Blueprint('twitter', __name__)
 
 
 @blueprint.route('/', methods=['GET', 'POST'])
 def login():  # pragma: no cover
+    """Login with Twitter."""
+    next_url = request.args.get("next")
     return twitter.oauth.authorize(callback=url_for('.oauth_authorized',
-                                                    next=request.args.get("next")))
+                                                    next=next_url))
 
 
 @twitter.oauth.tokengetter
 def get_twitter_token():  # pragma: no cover
+    """Get Twitter token from session."""
     if current_user.is_anonymous():
         return None
 
@@ -46,42 +46,12 @@ def get_twitter_token():  # pragma: no cover
             current_user.info['twitter_token']['oauth_token_secret']))
 
 
-def manage_user(access_token, user_data, next_url):
-    """Manage the user after signin"""
-    # Twitter API does not provide a way
-    # to get the e-mail so we will ask for it
-    # only the first time
-    user = db.session.query(User)\
-             .filter_by(twitter_user_id=user_data['user_id'])\
-             .first()
-
-    if user is not None:
-        return user
-
-    twitter_token = dict(oauth_token=access_token['oauth_token'],
-                         oauth_token_secret=access_token['oauth_token_secret'])
-    info = dict(twitter_token=twitter_token)
-    user = db.session.query(User)\
-        .filter_by(name=user_data['screen_name'])\
-        .first()
-
-    if user is not None:
-        return None
-
-    user = User(fullname=user_data['screen_name'],
-           name=user_data['screen_name'],
-           email_addr=user_data['screen_name'],
-           twitter_user_id=user_data['user_id'],
-           info=info)
-    db.session.add(user)
-    db.session.commit()
-    return user
-
-
 @blueprint.route('/oauth-authorized')
 @twitter.oauth.authorized_handler
 def oauth_authorized(resp):  # pragma: no cover
-    """Called after authorization. After this function finished handling,
+    """Called after authorization.
+
+    After this function finished handling,
     the OAuth information is removed from the session again. When this
     happened, the tokengetter from above is used to retrieve the oauth
     token and secret.
@@ -98,6 +68,10 @@ def oauth_authorized(resp):  # pragma: no cover
     if resp is None:
         flash(u'You denied the request to sign in.', 'error')
         return redirect(next_url)
+    if isinstance(resp, OAuthException):
+        flash('Access denied: %s' % resp.message)
+        current_app.logger.error(resp)
+        return redirect(next_url)
 
     access_token = dict(oauth_token=resp['oauth_token'],
                         oauth_token_secret=resp['oauth_token_secret'])
@@ -105,12 +79,42 @@ def oauth_authorized(resp):  # pragma: no cover
     user_data = dict(screen_name=resp['screen_name'],
                      user_id=resp['user_id'])
 
-    user = manage_user(access_token, user_data, next_url)
+    user = manage_user(access_token, user_data)
 
+    return manage_user_login(user, user_data, next_url)
+
+
+def manage_user(access_token, user_data):
+    """Manage the user after signin"""
+    # Twitter API does not provide a way
+    # to get the e-mail so we will ask for it
+    # only the first time
+    user = user_repo.get_by(twitter_user_id=user_data['user_id'])
+
+    if user is not None:
+        return user
+
+    twitter_token = dict(oauth_token=access_token['oauth_token'],
+                         oauth_token_secret=access_token['oauth_token_secret'])
+    info = dict(twitter_token=twitter_token)
+    user = user_repo.get_by_name(user_data['screen_name'])
+
+    if user is not None:
+        return None
+
+    user = User(fullname=user_data['screen_name'],
+           name=user_data['screen_name'],
+           email_addr=user_data['screen_name'],
+           twitter_user_id=user_data['user_id'],
+           info=info)
+    user_repo.save(user)
+    return user
+
+
+def manage_user_login(user, user_data, next_url):
+    """Manage user login."""
     if user is None:
-        user = db.session.query(User)\
-                 .filter_by(name=user_data['screen_name'])\
-                 .first()
+        user = user_repo.get_by_name(user_data['screen_name'])
         msg, method = get_user_signup_method(user)
         flash(msg, 'info')
         if method == 'local':
@@ -118,14 +122,14 @@ def oauth_authorized(resp):  # pragma: no cover
         else:
             return redirect(url_for('account.signin'))
 
-    first_login = False
     login_user(user, remember=True)
     flash("Welcome back %s" % user.fullname, 'success')
+    if ((user.email_addr != user.name) and user.newsletter_prompted is False
+            and newsletter.is_initialized()):
+        return redirect(url_for('account.newsletter_subscribe',
+                                next=next_url))
     if user.email_addr != user.name:
         return redirect(next_url)
-    if first_login:
-        flash("This is your first login, please add a valid e-mail")
     else:
         flash("Please update your e-mail address in your profile page")
-    return redirect(url_for('account.update_profile', name=user.name))
-
+        return redirect(url_for('account.update_profile', name=user.name))
