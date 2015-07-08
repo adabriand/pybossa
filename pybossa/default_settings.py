@@ -38,7 +38,7 @@ LOGO = ''
 LOCALES = ['en', 'es', 'it', 'fr']
 
 ## Default THEME
-THEME = 'contribua-theme'
+THEME = 'default'
 
 ## Default number of apps per page
 APPS_PER_PAGE = 20

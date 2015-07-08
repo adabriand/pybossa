@@ -80,4 +80,3 @@ class LocalUploader(Uploader):
             return os.path.isfile(path)
         except Exception:
             return False
->>>>>>> upstream/master
